@@ -277,6 +277,91 @@ def test_ots_stamp_failure_never_raises(monkeypatch, tmp_path):
     assert (tmp_path / "ots" / "2026-08-09.txt").exists()   # manifest still written
 
 
+# --- email digest (best-effort inbox delivery) ---
+
+def _cli_with_data(monkeypatch, tmp_path):
+    import esios_paper.__main__ as cli
+    monkeypatch.setattr(cli, "LEDGER", tmp_path / "ledger.jsonl")
+    monkeypatch.setattr(cli, "RECEIPTS", tmp_path / "receipts.jsonl")
+    monkeypatch.setattr(cli, "DATA_DIR", tmp_path)
+    rows = [
+        {"target": "2026-08-13", "strategy": loop.STRATEGY,
+         "pnl_eur": 322.13, "oracle_pnl_eur": 325.78, "capture": 0.989,
+         "tau": 0.899, "neg_hours": 0, "tb2_spread": 396.26},
+        {"target": "2026-08-13", "strategy": "battery-2h2h-climatology",
+         "pnl_eur": 315.79, "oracle_pnl_eur": 325.78, "capture": 0.969,
+         "tau": 0.855, "neg_hours": 0, "tb2_spread": 396.26},
+    ]
+    (tmp_path / "ledger.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n")
+    return cli
+
+
+def test_digest_builds_settlement_race_and_bar(monkeypatch, tmp_path):
+    cli = _cli_with_data(monkeypatch, tmp_path)
+    subject, body = cli.build_digest()
+    assert "esios digest 2026-08-13" in subject and "+322" in subject
+    assert "+322.13" in body and "tau 0.899" in body
+    assert "bar not met" in body          # 1 shared day never meets the bar
+    assert "ALERT" not in subject         # winning day, no alerts
+
+
+def test_digest_flags_losing_day(monkeypatch, tmp_path):
+    cli = _cli_with_data(monkeypatch, tmp_path)
+    rows = [json.loads(l) for l in (tmp_path / "ledger.jsonl").read_text().splitlines()]
+    rows[0]["pnl_eur"] = -12.5
+    (tmp_path / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    subject, body = cli.build_digest()
+    assert subject.startswith("ALERT — ")
+    assert "losing day" in body
+
+
+def test_email_digest_sends_on_settle_and_never_raises(monkeypatch, tmp_path):
+    cli = _cli_with_data(monkeypatch, tmp_path)
+    monkeypatch.setenv("ALERT_EMAIL_TO", "x@example.com")
+    monkeypatch.setenv("ALERT_SMTP_PASSWORD", "pw")
+    sent = []
+
+    class FakeSMTP:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def login(self, u, p): sent.append(("login", u))
+        def send_message(self, m): sent.append(("msg", m["Subject"]))
+    cli.email_digest({"settled": [{"x": 1}], "primary_receipt_stands": True},
+                     _smtp=FakeSMTP)
+    assert ("login", "x@example.com") in sent
+    assert any(k == "msg" for k, _ in sent)
+    # commit-only pass: silent
+    sent.clear()
+    cli.email_digest({"settled": [], "primary_receipt_stands": True},
+                     _smtp=FakeSMTP)
+    assert sent == []
+    # SMTP failure must never raise
+
+    def boom(*a, **k):
+        raise OSError("smtp down")
+    cli.email_digest({"settled": [{"x": 1}], "primary_receipt_stands": True},
+                     _smtp=boom)
+
+
+def test_email_digest_alerts_on_trouble_even_without_settlement(monkeypatch, tmp_path):
+    cli = _cli_with_data(monkeypatch, tmp_path)
+    monkeypatch.setenv("ALERT_EMAIL_TO", "x@example.com")
+    monkeypatch.setenv("ALERT_SMTP_PASSWORD", "pw")
+    subjects = []
+
+    class FakeSMTP:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def login(self, u, p): pass
+        def send_message(self, m): subjects.append(m["Subject"])
+    cli.email_digest({"settled": [], "primary_receipt_stands": False},
+                     _smtp=FakeSMTP)
+    assert subjects and subjects[0].startswith("ALERT — ")
+
+
 # --- heartbeat semantics (success = today's receipt exists) ---
 
 def test_heartbeat_signals_fail_when_no_receipt(monkeypatch):

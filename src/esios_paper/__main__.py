@@ -4,13 +4,16 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import smtplib
 import statistics
 import subprocess
 import sys
 import urllib.request
+from email.message import EmailMessage
+from math import comb
 from pathlib import Path
 
-from .loop import DATA_DIR, LEDGER, RECEIPTS, _load_jsonl, tick
+from .loop import DATA_DIR, LEDGER, RECEIPTS, STRATEGY, _load_jsonl, tick
 
 REPO = Path(__file__).resolve().parents[2]
 OTS_DIR = DATA_DIR / "ots"
@@ -41,6 +44,119 @@ def heartbeat(ok: bool, *, _urlopen=urllib.request.urlopen) -> None:
         print(f"[esios-paper] heartbeat pinged{'' if ok else ' (FAIL signal)'}")
     except Exception as exc:
         print(f"[esios-paper] heartbeat ping failed: {exc}")
+
+
+def _sign_p(wins: int, n: int) -> float:
+    """One-sided binomial P(X >= wins | n, 0.5) — the pre-registered test."""
+    return sum(comb(n, i) for i in range(wins, n + 1)) / 2 ** n
+
+
+def build_digest() -> tuple[str, str] | None:
+    """(subject, body) for the daily inbox digest — same numbers and house
+    rules as the cloud routine: lead with the outcome, never soften the math,
+    no superiority claims below the pre-registered bar."""
+    ledger = _load_jsonl(LEDGER)
+    if not ledger:
+        return None
+    latest = max(e["target"] for e in ledger)
+    today = {e["strategy"]: e for e in ledger if e["target"] == latest}
+    prim = [e for e in ledger if e["strategy"] == STRATEGY]
+    total = sum(e["pnl_eur"] for e in prim)
+    caps = [e["capture"] for e in prim if e.get("capture") is not None]
+    wins = sum(1 for e in prim if e["pnl_eur"] > 0)
+    losing_today = any(e["pnl_eur"] < 0 for e in today.values())
+    crosscheck = (DATA_DIR / "CROSSCHECK-ALERTS.log").exists()
+
+    lines = [f"Settlement {latest}:"]
+    for name, e in sorted(today.items()):
+        cap = f"{e['capture'] * 100:.1f}%" if e.get("capture") is not None else "n/a"
+        tau = f", tau {e['tau']:.3f}" if e.get("tau") is not None else ""
+        lines.append(f"  {name}: {e['pnl_eur']:+.2f} EUR ({cap}{tau})")
+    lines.append("")
+    lines.append(
+        f"Primary: {total:+.2f} EUR over {len(prim)} days | "
+        f"win rate {wins}/{len(prim)} | mean capture "
+        f"{statistics.fmean(caps) * 100:.1f}% | gate {min(len(prim), 21)}/21")
+
+    by_day: dict[str, dict[str, float]] = {}
+    for e in ledger:
+        by_day.setdefault(e["target"], {})[e["strategy"]] = e["pnl_eur"]
+    for shadow in sorted({e["strategy"] for e in ledger} - {STRATEGY}):
+        deltas = [v[shadow] - v[STRATEGY] for v in by_day.values()
+                  if shadow in v and STRATEGY in v]
+        w = sum(1 for d in deltas if d > 0.01)
+        l = sum(1 for d in deltas if d < -0.01)
+        n = w + l
+        p = _sign_p(w, n) if n else 1.0
+        lines.append(
+            f"{shadow} vs primary: {sum(deltas):+.2f} EUR over {len(deltas)} "
+            f"shared ({w}W-{len(deltas) - w - l}T-{l}L, sign p={p:.3f}"
+            f"{', bar not met' if not (n >= 30 and p < 0.05) else ', BAR MET'})")
+
+    prime = today.get(STRATEGY)
+    if prime is not None and prime.get("tb2_spread") is not None:
+        week = [e for e in prim if e.get("tb2_spread") is not None][-7:]
+        lines.append(
+            f"Regime: neg_hours {prime.get('neg_hours')} | tb2 "
+            f"{prime['tb2_spread']:.0f} EUR (7d mean "
+            f"{statistics.fmean(e['tb2_spread'] for e in week):.0f})")
+
+    alerts = []
+    if losing_today:
+        alerts.append("losing day in latest settlement (data, not a bug)")
+    if crosscheck:
+        alerts.append("CROSSCHECK-ALERTS.log present — price routes disagreed")
+    if alerts:
+        lines.insert(0, "ALERTS: " + "; ".join(alerts))
+        lines.insert(1, "")
+    subject = (("ALERT — " if alerts else "") +
+               f"esios digest {latest} · "
+               f"{(prime or {}).get('pnl_eur', 0):+.0f} € · {wins}/{len(prim)}")
+    lines.append("")
+    lines.append("Paper money, upper bound (exchange fees only). "
+                 "Full ledger: arturoquintana.github.io/spain-dayahead-ledger")
+    return subject, "\n".join(lines)
+
+
+def email_digest(summary: dict, *, _smtp=smtplib.SMTP_SSL) -> None:
+    """Send the digest after ticks that settled something, or on trouble
+    (fetch failure / primary receipt missing). Config in .env: ALERT_EMAIL_TO
+    + ALERT_SMTP_PASSWORD (Gmail app password; ALERT_SMTP_USER defaults to
+    the recipient). No config -> silently off. Never fatal — and a MISSING
+    daily email is itself a dead-man signal, like the heartbeat."""
+    to = _env("ALERT_EMAIL_TO")
+    password = _env("ALERT_SMTP_PASSWORD")
+    if not to or not password:
+        return
+    trouble = bool(summary.get("fetch_error")) or \
+        not summary.get("primary_receipt_stands", True)
+    if not summary.get("settled") and not trouble:
+        return                      # commit-only passes stay silent
+    try:
+        built = build_digest()
+        if built is None:
+            return
+        subject, body = built
+        if trouble:
+            problems = []
+            if summary.get("fetch_error"):
+                problems.append(f"fetch_error: {summary['fetch_error']}")
+            if not summary.get("primary_receipt_stands", True):
+                problems.append("PRIMARY RECEIPT DOES NOT STAND for tomorrow")
+            body = "TICK TROUBLE: " + "; ".join(problems) + "\n\n" + body
+            if not subject.startswith("ALERT"):
+                subject = "ALERT — " + subject
+        msg = EmailMessage()
+        msg["From"] = _env("ALERT_SMTP_USER") or to
+        msg["To"] = to
+        msg["Subject"] = subject
+        msg.set_content(body)
+        with _smtp("smtp.gmail.com", 465, timeout=30) as s:
+            s.login(_env("ALERT_SMTP_USER") or to, password)
+            s.send_message(msg)
+        print(f"[esios-paper] digest emailed ({subject!r})")
+    except Exception as exc:
+        print(f"[esios-paper] digest email FAILED (non-fatal): {exc}")
 
 
 def ots_manifest(label: str) -> str:
@@ -120,6 +236,7 @@ def cmd_tick() -> int:
     ots_stamp(s["date"])
     git_backup(s["date"])
     heartbeat(s["primary_receipt_stands"])
+    email_digest(s)
     print(f"[esios-paper] tick done {json.dumps({k: v if isinstance(v, (str, bool)) else bool(v) for k, v in s.items()})}")
     return 0
 
