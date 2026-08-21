@@ -181,20 +181,34 @@ def ots_stamp(label: str, *, _run=subprocess.run) -> None:
     design: a calendar/network failure must never fail the tick."""
     try:
         OTS_DIR.mkdir(parents=True, exist_ok=True)
-        manifest = OTS_DIR / f"{label}.txt"
-        manifest.write_text(ots_manifest(label))
-        proof = manifest.with_suffix(".txt.ots")
-        if proof.exists():          # idempotent: second pass same day
-            print("[esios-paper] ots: proof already exists")
+        content = ots_manifest(label)
+        # A STAMPED MANIFEST IS IMMUTABLE. The pre-2026-08-21 version
+        # rewrote <date>.txt on every pass and skipped stamping when a proof
+        # existed — so the second tick of a day (post-settlement hashes)
+        # silently invalidated the morning's proof (audit finding, incident
+        # 2026-08-21). Now: if the audit trail moved after a stamp, the new
+        # state gets a NEW suffixed manifest; stamped pairs are never touched.
+        for n in range(1, 25):
+            manifest = OTS_DIR / (f"{label}.txt" if n == 1
+                                  else f"{label}-{n}.txt")
+            proof = manifest.with_suffix(".txt.ots")
+            if proof.exists():
+                if manifest.read_text() == content:
+                    print(f"[esios-paper] ots: {manifest.name} already "
+                          "attested for current state")
+                    return
+                continue            # stamped for an older state; next slot
+            manifest.write_text(content)
+            r = _run(["uvx", "--from", "opentimestamps-client", "ots",
+                      "stamp", str(manifest)],
+                     capture_output=True, text=True, timeout=120)
+            if r.returncode == 0 and proof.exists():
+                print(f"[esios-paper] ots: stamped {manifest.name}")
+            else:
+                print(f"[esios-paper] ots: STAMP-FAILED "
+                      f"{(r.stderr or r.stdout).strip()[:200]}")
             return
-        r = _run(["uvx", "--from", "opentimestamps-client", "ots",
-                  "stamp", str(manifest)],
-                 capture_output=True, text=True, timeout=120)
-        if r.returncode == 0 and proof.exists():
-            print(f"[esios-paper] ots: stamped {manifest.name}")
-        else:
-            print(f"[esios-paper] ots: STAMP-FAILED "
-                  f"{(r.stderr or r.stdout).strip()[:200]}")
+        print("[esios-paper] ots: STAMP-FAILED (slot overflow)")
     except Exception as exc:
         print(f"[esios-paper] ots: STAMP-FAILED {exc}")
 

@@ -260,6 +260,36 @@ def test_ots_manifest_binds_current_audit_trail(monkeypatch, tmp_path):
     assert cli.ots_manifest("2026-08-09") != m1
 
 
+def test_ots_stamped_manifest_is_immutable_second_tick_gets_new_slot(
+        monkeypatch, tmp_path):
+    """Regression for the 2026-08-21 audit finding: the second tick of a day
+    (audit trail changed by settlement) must NEVER rewrite an already-stamped
+    manifest — it stamps a suffixed one. 12/13 proofs were invalidated by the
+    old overwrite-then-skip behavior."""
+    import esios_paper.__main__ as cli
+    monkeypatch.setattr(cli, "RECEIPTS", tmp_path / "receipts.jsonl")
+    monkeypatch.setattr(cli, "LEDGER", tmp_path / "ledger.jsonl")
+    monkeypatch.setattr(cli, "OTS_DIR", tmp_path / "ots")
+
+    def fake_stamp(cmd, **kw):
+        Path(cmd[-1] + ".ots").write_bytes(b"proof")
+        class R: returncode = 0; stderr = ""; stdout = ""
+        return R()
+    from pathlib import Path
+    (tmp_path / "receipts.jsonl").write_text("morning\n")
+    cli.ots_stamp("2026-08-21", _run=fake_stamp)
+    first = (tmp_path / "ots" / "2026-08-21.txt").read_text()
+    # settlement changes the audit trail; tick runs again
+    (tmp_path / "receipts.jsonl").write_text("morning\nevening\n")
+    cli.ots_stamp("2026-08-21", _run=fake_stamp)
+    assert (tmp_path / "ots" / "2026-08-21.txt").read_text() == first  # UNTOUCHED
+    assert (tmp_path / "ots" / "2026-08-21-2.txt").exists()            # new slot
+    assert (tmp_path / "ots" / "2026-08-21-2.txt.ots").exists()
+    # third run, unchanged state: idempotent, no third slot
+    cli.ots_stamp("2026-08-21", _run=fake_stamp)
+    assert not (tmp_path / "ots" / "2026-08-21-3.txt").exists()
+
+
 def test_ots_stamp_failure_never_raises(monkeypatch, tmp_path):
     import esios_paper.__main__ as cli
     monkeypatch.setattr(cli, "RECEIPTS", tmp_path / "receipts.jsonl")

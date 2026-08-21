@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Publish the public mirror: render the dashboard, sync the allowlist, push.
+# Called after each tick on the server. Best-effort: never fails the tick.
+# The mirror checkout lives at $MIRROR_DIR (default ~/ledger-mirror) with its
+# own deploy key. ALLOWLIST ONLY — ops files (CLAUDE.md, AGENTS.md, plans,
+# server scripts) never leave the private repo.
+set -uo pipefail
+cd "$(dirname "$0")/.."
+export PATH="$HOME/.local/bin:$PATH"
+MIRROR="${MIRROR_DIR:-$HOME/ledger-mirror}"
+[ -d "$MIRROR/.git" ] || { echo "[mirror] $MIRROR not initialized; skipping"; exit 0; }
+
+uv run python scripts/render_dashboard.py "$MIRROR/index.html"
+mkdir -p "$MIRROR/docs"
+rsync -a --delete --exclude __pycache__ Data/ "$MIRROR/Data/"
+rsync -a --delete --exclude __pycache__ src/ "$MIRROR/src/"
+rsync -a --delete --exclude __pycache__ tests/ "$MIRROR/tests/"
+rsync -a --delete --exclude __pycache__ scripts/ "$MIRROR/scripts/"
+cp VERIFY.md GOVERNANCE.md pyproject.toml uv.lock "$MIRROR/"
+for d in backtest-baselines-2015-2026.md ARCHITECTURE.md \
+         gate-analysis-plan.md gate-verdict-2026-08.md incidents.md; do
+  cp "docs/$d" "$MIRROR/docs/" 2>/dev/null || true
+done
+cp README-public.md "$MIRROR/README.md"
+
+cd "$MIRROR"
+if [ -n "$(git status --porcelain)" ]; then
+  git add -A
+  git commit -q -m "ledger update $(date -u +%FT%TZ)"
+  git push -q && echo "[mirror] published" || echo "[mirror] PUSH-FAILED (rides next publish)"
+else
+  echo "[mirror] up to date"
+fi

@@ -24,6 +24,23 @@ anchoring that manifest in Bitcoin. Verify with the open-source client:
 (Proofs are stamped daily and upgraded to Bitcoin-anchored weekly; a
 just-created proof may still be "pending" — re-run `ots upgrade` later.)
 
+**Evidence boundaries, stated plainly.** This public mirror was created on
+2026-08-10: days before that date entered it in one bulk commit, so the
+"weak check" above cannot corroborate them from this repository alone (the
+private operations repository holds their per-tick commit history, shown on
+request). OTS attestation begins 2026-08-08; the first week (2026-07-30 →
+2026-08-07) has no Bitcoin anchoring and cannot acquire it retroactively —
+timestamps cannot be backdated, which is the entire point of the mechanism.
+Treat the record as three tiers of strength: OTS-anchored (2026-08-08+),
+git-corroborated (private repo, 2026-07-30+), and the mirror's own history
+(2026-08-10+). On 2026-08-21 an independent audit found that same-day
+re-ticks had been silently rewriting stamped manifests, invalidating 12
+proofs; the stamped originals were restored from git history (every proof
+now matches), the tick was fixed so stamped manifests are immutable
+(changed state gets a new suffixed manifest), and a regression test pins
+the class. Data/esios_prices.json (the independent cross-check route)
+updates WEEKLY by design — staleness under 7 days is normal.
+
 ## 2. The arithmetic claim (P&L follows from receipts + public prices)
 
 Prices are public: apidatos.ree.es (no key) or api.esios.ree.es (free key),
@@ -41,11 +58,16 @@ route is cross-checked weekly (`scripts/crosscheck_routes.py`).
 ## 3. The no-cherry-picking claim
 
 Both audit files are append-only: every receipt ever committed has a
-settlement or a documented missed day — losing days and misses stay in the
-record (see 2026-08-05 / 2026-08-07). Strategy changes require a new
-pre-registered strategy id; old receipts stand. Stop conditions are
-pre-registered in CLAUDE.md § Falsification, and strategy-vs-strategy claims
-must clear the pre-registered sign-test bar (§ Deciding strategy comparisons).
+settlement or a documented missed day. MISSED days stay in the record
+(2026-08-05 and 2026-08-07 are real examples). LOSING days will stay
+identically when they occur — as of 2026-08-21 the primary has none in 21
+settled days, a fact we flag rather than celebrate: the sample is one
+solar-heavy August, and our own 11.5-year backtest says winter brings
+losing days. Strategy changes require a new
+pre-registered strategy id; old receipts stand. Stop conditions and the
+comparison bar are pre-registered in GOVERNANCE.md (the public extract of
+the operating constitution); strategy-vs-strategy claims must clear that
+bar (`scripts/compare_strategies.py` in this repository).
 
 ## 4. What this ledger does NOT claim
 
