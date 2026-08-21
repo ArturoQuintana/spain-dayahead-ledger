@@ -118,12 +118,13 @@ def build_digest() -> tuple[str, str] | None:
     return subject, "\n".join(lines)
 
 
-def email_digest(summary: dict, *, _smtp=smtplib.SMTP_SSL) -> None:
+def email_digest(summary: dict, *, _smtp=smtplib.SMTP) -> None:
     """Send the digest after ticks that settled something, or on trouble
     (fetch failure / primary receipt missing). Config in .env: ALERT_EMAIL_TO
     + ALERT_SMTP_PASSWORD (Gmail app password; ALERT_SMTP_USER defaults to
-    the recipient). No config -> silently off. Never fatal — and a MISSING
-    daily email is itself a dead-man signal, like the heartbeat."""
+    the recipient). Port 587 + STARTTLS deliberately: Hetzner blocks
+    outbound 465/25 by default. No config -> silently off. Never fatal — a
+    MISSING daily email is itself a dead-man signal, like the heartbeat."""
     to = _env("ALERT_EMAIL_TO")
     password = _env("ALERT_SMTP_PASSWORD")
     if not to or not password:
@@ -151,7 +152,8 @@ def email_digest(summary: dict, *, _smtp=smtplib.SMTP_SSL) -> None:
         msg["To"] = to
         msg["Subject"] = subject
         msg.set_content(body)
-        with _smtp("smtp.gmail.com", 465, timeout=30) as s:
+        with _smtp("smtp.gmail.com", 587, timeout=30) as s:
+            s.starttls()
             s.login(_env("ALERT_SMTP_USER") or to, password)
             s.send_message(msg)
         print(f"[esios-paper] digest emailed ({subject!r})")

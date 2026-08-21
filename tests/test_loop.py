@@ -326,6 +326,7 @@ def test_email_digest_sends_on_settle_and_never_raises(monkeypatch, tmp_path):
         def __init__(self, *a, **k): pass
         def __enter__(self): return self
         def __exit__(self, *a): pass
+        def starttls(self): sent.append(("tls", None))
         def login(self, u, p): sent.append(("login", u))
         def send_message(self, m): sent.append(("msg", m["Subject"]))
     cli.email_digest({"settled": [{"x": 1}], "primary_receipt_stands": True},
@@ -355,6 +356,7 @@ def test_email_digest_alerts_on_trouble_even_without_settlement(monkeypatch, tmp
         def __init__(self, *a, **k): pass
         def __enter__(self): return self
         def __exit__(self, *a): pass
+        def starttls(self): pass
         def login(self, u, p): pass
         def send_message(self, m): subjects.append(m["Subject"])
     cli.email_digest({"settled": [], "primary_receipt_stands": False},

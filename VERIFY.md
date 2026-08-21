@@ -55,3 +55,15 @@ exchange fees only: no grid charges, taxes, or aggregator margin, so absolute
 EUR is an upper bound on what a real asset would net. Relative metrics
 (capture, tau, strategy deltas) are robust to that. Hourly frame; the market
 itself clears at 15-minute granularity since 2025-10-01.
+
+Two disclosures the verified-track-record industry has taught us to make
+explicitly (see docs/research-track-records-2026-08.md): these are SIGNAL
+records, not real-money execution records — the distinction that
+QuantConnect's Alpha Streams glossed and later regretted. And "independent"
+here means independent of the STRATEGY (nothing can be revised after
+commitment); the ledger is operated by the project itself — the
+OpenTimestamps anchoring exists precisely so that operator role never has to
+be taken on trust. Two structural guarantees follow from the same industry's
+failure modes: records never start before their first pre-committed receipt
+(no backfill), and a retired strategy's settled history is never removed
+(no survivorship laundering).
