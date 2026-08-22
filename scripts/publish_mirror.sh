@@ -12,7 +12,13 @@ MIRROR="${MIRROR_DIR:-$HOME/ledger-mirror}"
 
 uv run python scripts/render_dashboard.py "$MIRROR/index.html"
 mkdir -p "$MIRROR/docs"
-rsync -a --delete --exclude __pycache__ Data/ "$MIRROR/Data/"
+# ES data only. Silent shadow markets (de/ercot/it) accumulate PRIVATELY and
+# must NOT reach the public mirror until the auditor is extended per-market
+# (hard gate, docs/shadow-ledgers-*.md) — Italy additionally needs price
+# redaction. Exclude every per-market subdir; ES lives in Data/ root files.
+rsync -a --delete --exclude __pycache__ \
+  --exclude 'de/' --exclude 'ercot/' --exclude 'it/' \
+  Data/ "$MIRROR/Data/"
 rsync -a --delete --exclude __pycache__ src/ "$MIRROR/src/"
 rsync -a --delete --exclude __pycache__ tests/ "$MIRROR/tests/"
 rsync -a --delete --exclude __pycache__ scripts/ "$MIRROR/scripts/"

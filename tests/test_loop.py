@@ -178,6 +178,32 @@ def test_legacy_receipt_without_basis_profile_settles_with_tau_none():
     assert e["pnl_eur"] > 0     # settlement itself unaffected
 
 
+def test_second_market_runs_in_isolation(tmp_path):
+    """Multi-market foundation: a non-ES market commits/settles into its OWN
+    Data/<slug>/ tree, with its own timezone/deadline/currency, and never
+    touches Spain's files (the autouse fixture's ES paths)."""
+    from datetime import datetime
+    de = loop.Market.make("de", "Europe/Berlin", fetch=None,
+                          deadline_hour=12, currency="EUR", root=tmp_path)
+    d1 = _flat_day("2026-08-01", 60, cheap=(3, 4), dear=(20, 21))
+    s1 = tick(market=de, fetch=lambda a, b: d1, today=date(2026, 8, 1))
+    assert s1["market"] == "de"
+    assert (tmp_path / "de" / "receipts.jsonl").exists()
+    assert not loop.RECEIPTS.exists()            # ES tree untouched
+    rec = json.loads((tmp_path / "de" / "receipts.jsonl").read_text().splitlines()[0])
+    assert rec["params"]["currency"] == "EUR"
+    # DE deadline is 12:00 Berlin — a 12:30 tick must refuse (clock guard)
+    late = lambda: datetime(2026, 8, 2, 12, 30, tzinfo=de.tz)
+    s2 = tick(market=de, fetch=lambda a, b: d1, today=date(2026, 8, 2),
+              sleep=lambda _s: None, now_fn=late)
+    assert any("clock guard" in m for m in s2["skipped"])
+    # settle DE's 08-02 receipt independently
+    d2 = _flat_day("2026-08-02", 80, cheap=(3, 4), dear=(20, 21))
+    s3 = tick(market=de, fetch=lambda a, b: {**d1, **d2}, today=date(2026, 8, 2))
+    assert len(s3["settled"]) >= 1
+    assert (tmp_path / "de" / "ledger.jsonl").exists()
+
+
 def test_clock_guard_refuses_commit_after_deadline_even_with_stale_dataset():
     """The 2026-08-20 review finding: all fetches fail, tick runs late — the
     dataset-relative leak guard can't see published prices, so only the
@@ -282,6 +308,33 @@ def test_fetch_retry_recovers_transient_failure_and_commits():
     assert s["settled"] and s["settled"][0]["target"] == "2026-08-02"
     assert any(r["target"] == "2026-08-03" for r in s["committed"])
     assert s["primary_receipt_stands"]
+
+
+# --- CLI market routing (silent markets skip ES-only side effects) ---
+
+def test_cmd_tick_silent_market_skips_heartbeat_email_git_ots(monkeypatch):
+    import esios_paper.__main__ as cli
+    import esios_paper.markets as markets
+    calls = []
+    monkeypatch.setattr(cli, "tick", lambda **kw: {
+        "market": kw["market"].slug, "date": "2026-08-22", "target": "2026-08-23",
+        "settled": [], "committed": [], "skipped": []})
+    for name in ("ots_stamp", "git_backup", "heartbeat", "email_digest"):
+        monkeypatch.setattr(cli, name, lambda *a, n=name, **k: calls.append(n))
+    rc = cli.cmd_tick("de")
+    assert rc == 0
+    assert calls == []                       # no ES-only side effects for a silent market
+    # ES path still fires them
+    monkeypatch.setattr(cli, "tick", lambda **kw: {
+        "date": "2026-08-22", "target": "2026-08-23", "settled": [],
+        "committed": [], "skipped": [], "primary_receipt_stands": True})
+    cli.cmd_tick()
+    assert set(calls) == {"ots_stamp", "git_backup", "heartbeat", "email_digest"}
+
+
+def test_cmd_tick_unknown_market_errors(monkeypatch):
+    import esios_paper.__main__ as cli
+    assert cli.cmd_tick("atlantis") == 2
 
 
 # --- OpenTimestamps attestation (best-effort, never fatal) ---

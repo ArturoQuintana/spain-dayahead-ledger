@@ -33,9 +33,11 @@ from __future__ import annotations
 import json
 import statistics
 import time
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from math import isfinite
 from pathlib import Path
+from typing import Callable
 from zoneinfo import ZoneInfo
 
 MARKET_TZ = ZoneInfo("Europe/Madrid")
@@ -47,16 +49,16 @@ MARKET_TZ = ZoneInfo("Europe/Madrid")
 COMMIT_DEADLINE_HOUR = 13
 
 
-def market_now() -> datetime:
-    return datetime.now(MARKET_TZ)
+def market_now(tz: ZoneInfo = MARKET_TZ) -> datetime:
+    return datetime.now(tz)
 
 
-def market_today() -> date:
-    """The market's current delivery date. Receipts/settlements are keyed by
-    Europe/Madrid days, NEVER machine-local ones: the loop has already run
-    from CEST and EDT (and a catch-up tick can fire at any hour), so local
+def market_today(tz: ZoneInfo = MARKET_TZ) -> date:
+    """The market's current delivery date, in its OWN timezone. Receipts and
+    settlements are keyed by market-local days, NEVER machine-local ones: the
+    loop has run from CEST, EDT, and (for other markets) other zones, so local
     date.today() can disagree with the market day by one."""
-    return datetime.now(MARKET_TZ).date()
+    return datetime.now(tz).date()
 
 from .fetch import fetch_hourly
 
@@ -80,17 +82,54 @@ MIN_BASIS_HOURS = 23    # a basis day must be complete (23 on the DST-spring day
 FETCH_RETRY_DELAYS_S = (300, 900)
 
 
+@dataclass(frozen=True)
+class Market:
+    """A day-ahead market the loop can run. Spain (ES) is the default and uses
+    the repo-root Data/ tree; additional markets get Data/<slug>/, their own
+    timezone, commit deadline, currency, and fetch client. The strategy panel,
+    P&L math, leak/clock guards, and telemetry are all market-agnostic — only
+    these parameters change (multi-market build, 2026-08-22)."""
+    slug: str
+    tz: ZoneInfo
+    deadline_hour: int
+    currency: str
+    prices_path: Path
+    receipts_path: Path
+    ledger_path: Path
+    fetch: Callable[[date, date], dict[str, float]]
+
+    @classmethod
+    def make(cls, slug: str, tz: str | ZoneInfo, fetch: Callable, *,
+             deadline_hour: int = COMMIT_DEADLINE_HOUR, currency: str = "EUR",
+             root: Path | None = None) -> "Market":
+        d = (root or DATA_DIR) / slug
+        return cls(slug, ZoneInfo(tz) if isinstance(tz, str) else tz,
+                   deadline_hour, currency, d / "prices.json",
+                   d / "receipts.jsonl", d / "ledger.jsonl", fetch)
+
+
+def _default_market() -> Market:
+    """Spain on the repo-root Data/ paths. Reads the module globals LIVE so
+    tests that monkeypatch loop.PRICES/RECEIPTS/LEDGER keep working, and so
+    ES behavior is byte-identical to the pre-parameterization loop."""
+    return Market("es", MARKET_TZ, COMMIT_DEADLINE_HOUR, "EUR",
+                  PRICES, RECEIPTS, LEDGER, fetch_hourly)
+
+
 # --- storage (dataset of record: hourly prices; append-only receipt/ledger) ---
 
-def load_prices() -> dict[str, float]:
-    if PRICES.exists():
-        return {r["ts"]: r["price"] for r in json.loads(PRICES.read_text())}
+def load_prices(path: Path | None = None) -> dict[str, float]:
+    path = path or PRICES
+    if path.exists():
+        return {r["ts"]: r["price"] for r in json.loads(path.read_text())}
     return {}
 
 
-def save_prices(prices: dict[str, float]) -> None:
+def save_prices(prices: dict[str, float], path: Path | None = None) -> None:
+    path = path or PRICES
+    path.parent.mkdir(parents=True, exist_ok=True)
     rows = [{"ts": k, "price": v} for k, v in sorted(prices.items())]
-    PRICES.write_text(json.dumps(rows))
+    path.write_text(json.dumps(rows))
 
 
 def _append(path: Path, record: dict) -> None:
@@ -259,25 +298,29 @@ STRATEGIES = [
 
 # --- the tick ---
 
-def tick(*, fetch=fetch_hourly, today: date | None = None,
+def tick(*, market: Market | None = None, fetch=None, today: date | None = None,
          sleep=time.sleep, now_fn=None) -> dict:
-    """One idempotent daily pass: update prices -> settle due receipts ->
-    commit tomorrow's receipt (leak guard + clock guard permitting). Returns
-    a summary dict. `fetch`/`today`/`sleep`/`now_fn` injectable for tests;
-    an injected `today` without `now_fn` assumes mid-window (11:00 Madrid)."""
+    """One idempotent daily pass for ONE market: update prices -> settle due
+    receipts -> commit tomorrow's receipt (leak guard + clock guard
+    permitting). Returns a summary dict. `market` defaults to Spain.
+    `fetch`/`today`/`sleep`/`now_fn` injectable for tests; an injected `today`
+    without `now_fn` assumes mid-window (11:00 market-local)."""
+    market = market or _default_market()
+    fetch = fetch or market.fetch
     if now_fn is not None:
         now = now_fn()
     elif today is not None:
         now = datetime.combine(today, datetime.min.time(),
-                               tzinfo=MARKET_TZ).replace(hour=11)
+                               tzinfo=market.tz).replace(hour=11)
     else:
-        now = market_now()
+        now = market_now(market.tz)
     today = today or now.date()
     tomorrow = today + timedelta(days=1)
-    summary: dict = {"date": today.isoformat(), "target": tomorrow.isoformat(),
+    summary: dict = {"market": market.slug, "date": today.isoformat(),
+                     "target": tomorrow.isoformat(),
                      "settled": [], "committed": [], "skipped": []}
 
-    prices = load_prices()
+    prices = load_prices(market.prices_path)
     last_ts = max(prices) if prices else "2026-01-26T23"
     fetch_from = date.fromisoformat(last_ts[:10])
     attempts = 1 + len(FETCH_RETRY_DELAYS_S)
@@ -288,7 +331,7 @@ def tick(*, fetch=fetch_hourly, today: date | None = None,
             if bad:
                 raise ValueError(bad)
             prices.update(fetched)
-            save_prices(prices)
+            save_prices(prices, market.prices_path)
             summary.pop("fetch_error", None)
             break
         except Exception as exc:
@@ -309,8 +352,8 @@ def tick(*, fetch=fetch_hourly, today: date | None = None,
     #    Keyed by (target, strategy, version): parallel shadow receipts for the
     #    same target settle independently and never mask each other.
     settled_keys = {(r["target"], r["strategy"], r["strategy_version"])
-                    for r in _load_jsonl(LEDGER)}
-    for rec in _load_jsonl(RECEIPTS):
+                    for r in _load_jsonl(market.ledger_path)}
+    for rec in _load_jsonl(market.receipts_path):
         target = rec["target"]
         key = (target, rec["strategy"], rec["strategy_version"])
         if key in settled_keys:
@@ -348,7 +391,7 @@ def tick(*, fetch=fetch_hourly, today: date | None = None,
             hours = sorted(h for h in basis if h in actual)
             entry["tau"] = kendall_tau([basis[h] for h in hours],
                                        [actual[h] for h in hours])
-        _append(LEDGER, entry)
+        _append(market.ledger_path, entry)
         summary["settled"].append(entry)
         settled_keys.add(key)
 
@@ -360,13 +403,14 @@ def tick(*, fetch=fetch_hourly, today: date | None = None,
         summary["skipped"].append(f"prices for {target} already published — "
                                   "commit window missed; no receipts (leak guard)")
     elif now.date() >= tomorrow or (
-            now.date() == today and now.hour >= COMMIT_DEADLINE_HOUR):
+            now.date() == today and now.hour >= market.deadline_hour):
         summary["skipped"].append(
-            f"past the {COMMIT_DEADLINE_HOUR}:00 Europe/Madrid commit "
+            f"past the {market.deadline_hour}:00 {market.tz.key} commit "
             f"deadline ({now:%H:%M}) — no receipts (clock guard); a missed "
             "day is honest, a post-publication receipt is worthless")
     else:
-        existing = {(r["target"], r["strategy"]) for r in _load_jsonl(RECEIPTS)}
+        existing = {(r["target"], r["strategy"])
+                    for r in _load_jsonl(market.receipts_path)}
         for spec in STRATEGIES:
             name = spec["strategy"]
             if (target.isoformat(), name) in existing:
@@ -388,14 +432,14 @@ def tick(*, fetch=fetch_hourly, today: date | None = None,
                                   for h, p in sorted(basis.items())},
                 "strategy": name, "strategy_version": spec["strategy_version"],
                 "params": {"power_mw": POWER_MW, "rt_eff": RT_EFF,
-                           "fee_eur_mwh": FEE_EUR_MWH},
+                           "fee_eur_mwh": FEE_EUR_MWH, "currency": market.currency},
                 "committed_at": datetime.now(timezone.utc).isoformat(),
             }
-            _append(RECEIPTS, receipt)
+            _append(market.receipts_path, receipt)
             summary["committed"].append(receipt)
 
     # The heartbeat's one question: does the PRIMARY receipt for tomorrow stand?
     summary["primary_receipt_stands"] = any(
         r["target"] == target.isoformat() and r["strategy"] == STRATEGY
-        for r in _load_jsonl(RECEIPTS))
+        for r in _load_jsonl(market.receipts_path))
     return summary

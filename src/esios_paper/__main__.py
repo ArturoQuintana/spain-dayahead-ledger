@@ -234,21 +234,42 @@ def git_backup(label: str) -> None:
                f"push) {p.stderr.strip()[:200]}")
 
 
-def cmd_tick() -> int:
-    s = tick()
+def _print_summary(s: dict, tag: str) -> None:
     if s.get("fetch_error"):
-        print(f"[esios-paper] FETCH-ERROR {s['fetch_error']}")
+        print(f"[{tag}] FETCH-ERROR {s['fetch_error']}")
     for e in s["settled"]:
-        print(f"[esios-paper] SETTLED {e['target']} [{e['strategy']} "
-              f"v{e['strategy_version']}]: pnl={e['pnl_eur']:+.2f} EUR "
+        print(f"[{tag}] SETTLED {e['target']} [{e['strategy']} "
+              f"v{e['strategy_version']}]: pnl={e['pnl_eur']:+.2f} "
               f"(oracle {e['oracle_pnl_eur']:+.2f}, capture {e['capture']}, "
               f"tau {e.get('tau')})")
     for r in s["committed"]:
-        print(f"[esios-paper] COMMITTED {r['target']} [{r['strategy']} "
+        print(f"[{tag}] COMMITTED {r['target']} [{r['strategy']} "
               f"v{r['strategy_version']}]: buy {r['buy_hours']} "
               f"sell {r['sell_hours']} (basis {r['basis_day']})")
     for msg in s["skipped"]:
-        print(f"[esios-paper] SKIPPED commit: {msg}")
+        print(f"[{tag}] SKIPPED commit: {msg}")
+
+
+def cmd_tick(market_slug: str | None = None) -> int:
+    """ES (default): full pass — settle/commit + OTS + git push + heartbeat +
+    email. A non-ES market runs a SILENT pass: settle/commit into its own
+    Data/<slug>/ and print, but NO heartbeat/email/OTS and NO separate git
+    push — its files ride the ES tick's git_backup (server_tick.sh runs the
+    silent markets first). Keeps the ES heartbeat/digest ES-only."""
+    if market_slug and market_slug != "es":
+        from .markets import MARKETS
+        if market_slug not in MARKETS:
+            print(f"unknown market {market_slug!r}; use: "
+                  f"{', '.join(MARKETS)}")
+            return 2
+        s = tick(market=MARKETS[market_slug])
+        _print_summary(s, f"esios-paper:{market_slug}")
+        print(f"[esios-paper:{market_slug}] tick done "
+              f"{json.dumps({k: v if isinstance(v, (str, bool)) else bool(v) for k, v in s.items()})}")
+        return 0
+
+    s = tick()
+    _print_summary(s, "esios-paper")
     ots_stamp(s["date"])
     git_backup(s["date"])
     heartbeat(s["primary_receipt_stands"])
@@ -288,12 +309,17 @@ def cmd_status() -> int:
 
 
 def main() -> int:
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "tick"
+    args = sys.argv[1:]
+    cmd = args[0] if args else "tick"
+    market = None
+    if "--market" in args:
+        i = args.index("--market")
+        market = args[i + 1] if i + 1 < len(args) else None
     if cmd == "tick":
-        return cmd_tick()
+        return cmd_tick(market)
     if cmd == "status":
         return cmd_status()
-    print(f"unknown command {cmd!r}; use: tick | status")
+    print(f"unknown command {cmd!r}; use: tick [--market <slug>] | status")
     return 2
 
 
