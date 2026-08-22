@@ -178,6 +178,45 @@ def test_legacy_receipt_without_basis_profile_settles_with_tau_none():
     assert e["pnl_eur"] > 0     # settlement itself unaffected
 
 
+def test_clock_guard_refuses_commit_after_deadline_even_with_stale_dataset():
+    """The 2026-08-20 review finding: all fetches fail, tick runs late — the
+    dataset-relative leak guard can't see published prices, so only the
+    clock refuses. A post-publication receipt must be impossible."""
+    from datetime import datetime
+    d1 = _flat_day("2026-08-01", 60)
+    tick(fetch=lambda a, b: d1, today=date(2026, 8, 1))
+
+    def boom(a, b):
+        raise OSError("network down all day")
+    late = lambda: datetime(2026, 8, 1, 17, 0, tzinfo=loop.MARKET_TZ)
+    s = tick(fetch=boom, today=date(2026, 8, 1), sleep=lambda _s: None,
+             now_fn=late)
+    assert s["committed"] == []
+    assert any("clock guard" in m for m in s["skipped"])
+    # before the deadline, the same stale state commits fine
+    early = lambda: datetime(2026, 8, 1, 11, 5, tzinfo=loop.MARKET_TZ)
+    s2 = tick(fetch=boom, today=date(2026, 8, 1), sleep=lambda _s: None,
+              now_fn=early)
+    assert s2["skipped"] == [] or not any("clock guard" in m
+                                          for m in s2["skipped"])
+
+
+def test_weekly_baseline_uses_same_weekday_last_week():
+    from datetime import timedelta
+    prices = {}
+    # day target-7 (2026-07-26) cheap at (2,3), dear at (18,19); yesterday
+    # (2026-08-01) cheap at (10,11), dear at (20,21)
+    prices.update(_flat_day("2026-07-26", 50, cheap=(2, 3), dear=(18, 19)))
+    for i in range(6):
+        d = (date(2026, 7, 27) + timedelta(days=i)).isoformat()
+        prices.update(_flat_day(d, 60, cheap=(10, 11), dear=(20, 21)))
+    s = tick(fetch=lambda a, b: prices, today=date(2026, 8, 1))
+    weekly = [r for r in s["committed"]
+              if r["strategy"] == "battery-2h2h-weekly"]
+    assert weekly and weekly[0]["buy_hours"] == [2, 3]
+    assert weekly[0]["sell_hours"] == [18, 19]     # last week's shape, not yesterday's
+
+
 def test_fetch_failure_keeps_loop_alive_and_leak_safe():
     d1 = _flat_day("2026-08-01", 60)
     tick(fetch=lambda a, b: d1, today=date(2026, 8, 1))
@@ -442,7 +481,7 @@ def test_climatology_commits_alongside_persistence_with_history():
     s = tick(fetch=lambda a, b: prices, today=date(2026, 8, 1))
     assert [r["strategy"] for r in s["committed"]] == [
         "battery-2h2h-persistence", "battery-2h2h-climatology",
-        "battery-2h2h-rankblend"]
+        "battery-2h2h-rankblend", "battery-2h2h-weekly"]
     clim = s["committed"][1]
     assert clim["buy_hours"] == [3, 4] and clim["sell_hours"] == [20, 21]
     assert s["primary_receipt_stands"] is True
@@ -452,18 +491,18 @@ def test_parallel_receipts_settle_independently_and_idempotently():
     prices = _month("2026-08-01", lambda i: [
         50.0 + (-40 if h in (3, 4) else 40 if h in (20, 21) else 0)
         for h in range(24)])
-    tick(fetch=lambda a, b: prices, today=date(2026, 8, 1))      # 3 receipts
+    tick(fetch=lambda a, b: prices, today=date(2026, 8, 1))      # 4 receipts
     truth = {**prices, **_flat_day("2026-08-02", 80, cheap=(3, 4), dear=(20, 21))}
     s = tick(fetch=lambda a, b: truth, today=date(2026, 8, 2))
-    assert len(s["settled"]) == 3                                 # one per strategy
+    assert len(s["settled"]) == 4                                 # one per strategy
     assert {e["strategy"] for e in s["settled"]} == {
         "battery-2h2h-persistence", "battery-2h2h-climatology",
-        "battery-2h2h-rankblend"}
+        "battery-2h2h-rankblend", "battery-2h2h-weekly"}
     # all picked the true windows here -> capture 1.0 across the panel
     assert all(e["capture"] == pytest.approx(1.0) for e in s["settled"])
     s3 = tick(fetch=lambda a, b: truth, today=date(2026, 8, 2))
     assert s3["settled"] == []                                    # never re-settled
-    assert len(loop.LEDGER.read_text().strip().splitlines()) == 3
+    assert len(loop.LEDGER.read_text().strip().splitlines()) == 4
 
 
 def test_climatology_averages_across_days_not_just_yesterday():
@@ -475,7 +514,7 @@ def test_climatology_averages_across_days_not_just_yesterday():
                 for h in range(24)]
     prices = _month("2026-08-01", shape)
     s = tick(fetch=lambda a, b: prices, today=date(2026, 8, 1))
-    pers, clim, blend = s["committed"]
+    pers, clim, blend = s["committed"][:3]
     assert pers["sell_hours"] == [9, 10]                          # yesterday's shape
     assert clim["sell_hours"] == [20, 21]                         # the month's shape
     # the blend averages the two legs' ranks: buys where both agree, sells a

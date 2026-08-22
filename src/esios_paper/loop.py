@@ -39,6 +39,16 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 MARKET_TZ = ZoneInfo("Europe/Madrid")
+# Hard commit deadline (Europe/Madrid clock). The auction publishes ~13:15
+# CET; the leak guard is dataset-relative and cannot see prices we failed to
+# fetch — an all-fetches-failed tick after publication would otherwise
+# commit a receipt timestamped AFTER truth existed publicly (adversarial
+# review finding, 2026-08-20). Belt (dataset) + suspenders (clock).
+COMMIT_DEADLINE_HOUR = 13
+
+
+def market_now() -> datetime:
+    return datetime.now(MARKET_TZ)
 
 
 def market_today() -> date:
@@ -177,6 +187,19 @@ def persistence_basis(prices: dict[str, float], today: date):
     return basis, None
 
 
+def weekly_basis(prices: dict[str, float], today: date):
+    """Shadow baseline (pre-registered 2026-08-22): same hour LAST WEEK —
+    p(d-7,h), the EPF literature's canonical naive reference (it carries
+    weekly seasonality that daily persistence misses; rMAE normalizes
+    against it). The panel's missing standard baseline, registered at
+    freeze-lift per the gate backlog."""
+    basis = day_profile(prices, today - timedelta(days=6))
+    if len(basis) < MIN_BASIS_HOURS:
+        return None, (f"basis day {today - timedelta(days=6)} "
+                      f"incomplete ({len(basis)} hours)")
+    return basis, None
+
+
 def climatology_basis(prices: dict[str, float], today: date):
     """Shadow-baseline basis: per-hour mean over the complete days in the
     trailing CLIM_WINDOW ending today. An hour enters when at least half those
@@ -229,17 +252,27 @@ STRATEGIES = [
      "basis_fn": climatology_basis},
     {"strategy": "battery-2h2h-rankblend", "strategy_version": "1",
      "basis_fn": rankblend_basis},
+    {"strategy": "battery-2h2h-weekly", "strategy_version": "1",
+     "basis_fn": weekly_basis},
 ]
 
 
 # --- the tick ---
 
 def tick(*, fetch=fetch_hourly, today: date | None = None,
-         sleep=time.sleep) -> dict:
+         sleep=time.sleep, now_fn=None) -> dict:
     """One idempotent daily pass: update prices -> settle due receipts ->
-    commit tomorrow's receipt (leak guard permitting). Returns a summary dict.
-    `fetch`/`today`/`sleep` injectable for tests."""
-    today = today or market_today()
+    commit tomorrow's receipt (leak guard + clock guard permitting). Returns
+    a summary dict. `fetch`/`today`/`sleep`/`now_fn` injectable for tests;
+    an injected `today` without `now_fn` assumes mid-window (11:00 Madrid)."""
+    if now_fn is not None:
+        now = now_fn()
+    elif today is not None:
+        now = datetime.combine(today, datetime.min.time(),
+                               tzinfo=MARKET_TZ).replace(hour=11)
+    else:
+        now = market_now()
+    today = today or now.date()
     tomorrow = today + timedelta(days=1)
     summary: dict = {"date": today.isoformat(), "target": tomorrow.isoformat(),
                      "settled": [], "committed": [], "skipped": []}
@@ -326,6 +359,12 @@ def tick(*, fetch=fetch_hourly, today: date | None = None,
     if day_profile(prices, target):
         summary["skipped"].append(f"prices for {target} already published — "
                                   "commit window missed; no receipts (leak guard)")
+    elif now.date() >= tomorrow or (
+            now.date() == today and now.hour >= COMMIT_DEADLINE_HOUR):
+        summary["skipped"].append(
+            f"past the {COMMIT_DEADLINE_HOUR}:00 Europe/Madrid commit "
+            f"deadline ({now:%H:%M}) — no receipts (clock guard); a missed "
+            "day is honest, a post-publication receipt is worthless")
     else:
         existing = {(r["target"], r["strategy"]) for r in _load_jsonl(RECEIPTS)}
         for spec in STRATEGIES:
