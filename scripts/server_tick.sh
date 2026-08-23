@@ -11,7 +11,11 @@ git pull --ff-only || echo "[esios-paper] pre-tick pull failed (continuing on lo
 # for these — they accumulate privately (not mirrored) until the auditor is
 # extended per-market. The 11:00 Madrid slot = 11:00 Berlin (<12:00 DE gate)
 # = 04:00 CT (<10:00 ERCOT deadline): pre-publication for both.
-for m in de ercot; do
+# ERCOT temporarily removed 2026-08-23: ercot.com returns HTTP 403 to the
+# Helsinki server (US-geo/datacenter block on the whole domain — DE/SMARD is
+# fine). Left in the loop it also stalls every tick ~20min via fetch retries.
+# Re-add once an EU-reachable ERCOT source lands (incident 2026-08-23).
+for m in de; do
   uv run python -m esios_paper tick --market "$m" \
     || echo "[esios-paper] $m tick failed (non-fatal, silent market)"
 done

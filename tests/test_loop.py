@@ -265,6 +265,22 @@ def test_validate_prices_rails():
     assert "insane" in loop.validate_prices({"t": True})
 
 
+def test_silent_market_fetch_fails_fast_no_retry_backoff(tmp_path):
+    """A silent market (fetch_retries=()) must NOT inherit ES's 20-min backoff:
+    it runs before ES in server_tick.sh, so a stalled silent fetch would delay
+    the primary tick. One attempt, zero sleeps."""
+    naps, attempts = [], []
+
+    def boom(a, b):
+        attempts.append(1)
+        raise OSError("down")
+    m = loop.Market.make("de", "Europe/Berlin", boom, deadline_hour=12,
+                         root=tmp_path)   # make() defaults fetch_retries=()
+    s = tick(market=m, today=date(2026, 8, 1), sleep=naps.append)
+    assert len(attempts) == 1 and naps == []      # no retries, no sleeps
+    assert "fetch_error" in s
+
+
 def test_corrupt_feed_is_refused_and_never_touches_the_dataset():
     d1 = _flat_day("2026-08-01", 60)
     tick(fetch=lambda a, b: d1, today=date(2026, 8, 1))

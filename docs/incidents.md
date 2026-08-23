@@ -15,8 +15,9 @@ resolution, detector added. Reviewed at month-ends. Seeded retroactively
 | 2026-08-20 | Hetzner egress block on SMTP 465; first server email send timed out | agent-session at live test (ESCAPE) | switch to 587+STARTTLS | port checked in code path; tests updated |
 | 2026-08-20 | Artifact publish version conflict | machinery (409) | resynced baseline | n/a (artifact deprecated for Pages) |
 | 2026-08-21 | OTS manifests silently rewritten by same-day re-ticks; 12/13 proofs invalidated (live defect in ots_stamp) | machinery (independent auditor) | stamped originals restored from git history; stamp logic made immutable-per-slot | regression test test_ots_stamped_manifest_is_immutable* |
+| 2026-08-23 | ERCOT go-live: ercot.com 403s the Helsinki server (US-geo/datacenter block, whole domain); fetch-retry backoff also stalled the tick ~20min | machinery (live server seed run) | ERCOT de-scheduled from server_tick; DE unaffected; source alternatives under review | de-scheduled; per-market source reachability now checked at wire-time |
 
-Escape rate: **5 of 8 incidents were escapes** (the 2026-08-21 OTS finding was caught by the Monday-auditor machinery — the closed loop's first win) (noticed
+Escape rate: **5 of 9 incidents were escapes** (the 2026-08-21 OTS finding was caught by the Monday-auditor machinery — the closed loop's first win) (noticed
 by a human or by an agent happening to look, not by machinery). This number
 is the justification for the closed-defect-loop apparatus — and the number
 the next 60 rolling days must drive to zero for the core to be declared

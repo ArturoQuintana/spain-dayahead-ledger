@@ -97,15 +97,22 @@ class Market:
     receipts_path: Path
     ledger_path: Path
     fetch: Callable[[date, date], dict[str, float]]
+    # Fetch-retry backoff (seconds between attempts). ES uses (300, 900) — a
+    # transient outage on the PRIMARY is worth waiting out. SILENT markets
+    # get () = fail fast: they run before ES in server_tick.sh, so a stalled
+    # silent fetch would delay the primary tick past its deadline.
+    fetch_retries: tuple[int, ...] = ()
 
     @classmethod
     def make(cls, slug: str, tz: str | ZoneInfo, fetch: Callable, *,
              deadline_hour: int = COMMIT_DEADLINE_HOUR, currency: str = "EUR",
-             root: Path | None = None) -> "Market":
+             root: Path | None = None,
+             fetch_retries: tuple[int, ...] = ()) -> "Market":
         d = (root or DATA_DIR) / slug
         return cls(slug, ZoneInfo(tz) if isinstance(tz, str) else tz,
                    deadline_hour, currency, d / "prices.json",
-                   d / "receipts.jsonl", d / "ledger.jsonl", fetch)
+                   d / "receipts.jsonl", d / "ledger.jsonl", fetch,
+                   fetch_retries)
 
 
 def _default_market() -> Market:
@@ -113,7 +120,7 @@ def _default_market() -> Market:
     tests that monkeypatch loop.PRICES/RECEIPTS/LEDGER keep working, and so
     ES behavior is byte-identical to the pre-parameterization loop."""
     return Market("es", MARKET_TZ, COMMIT_DEADLINE_HOUR, "EUR",
-                  PRICES, RECEIPTS, LEDGER, fetch_hourly)
+                  PRICES, RECEIPTS, LEDGER, fetch_hourly, FETCH_RETRY_DELAYS_S)
 
 
 # --- storage (dataset of record: hourly prices; append-only receipt/ledger) ---
@@ -323,8 +330,8 @@ def tick(*, market: Market | None = None, fetch=None, today: date | None = None,
     prices = load_prices(market.prices_path)
     last_ts = max(prices) if prices else "2026-01-26T23"
     fetch_from = date.fromisoformat(last_ts[:10])
-    attempts = 1 + len(FETCH_RETRY_DELAYS_S)
-    for attempt in range(attempts):
+    retries = market.fetch_retries
+    for attempt in range(1 + len(retries)):
         try:
             fetched = fetch(fetch_from, tomorrow)
             bad = validate_prices(fetched)
@@ -339,14 +346,14 @@ def tick(*, market: Market | None = None, fetch=None, today: date | None = None,
             # possible (and is still leak-safe: the guard checks OUR dataset,
             # and without a fetch no new knowledge entered it).
             summary["fetch_error"] = str(exc)
-            print(f"[esios-paper] fetch failed "
-                  f"(attempt {attempt + 1}/{attempts}): {exc}")
-            if attempt < len(FETCH_RETRY_DELAYS_S):
-                delay = FETCH_RETRY_DELAYS_S[attempt]
-                print(f"[esios-paper] retrying in {delay}s")
-                sleep(delay)
+            print(f"[esios-paper:{market.slug}] fetch failed "
+                  f"(attempt {attempt + 1}/{1 + len(retries)}): {exc}")
+            if attempt < len(retries):
+                print(f"[esios-paper:{market.slug}] retrying in {retries[attempt]}s")
+                sleep(retries[attempt])
             else:
-                print("[esios-paper] fetch gave up; continuing with stored data")
+                print(f"[esios-paper:{market.slug}] fetch gave up; "
+                      "continuing with stored data")
 
     # 1) settle every unsettled receipt whose target day is fully published.
     #    Keyed by (target, strategy, version): parallel shadow receipts for the
