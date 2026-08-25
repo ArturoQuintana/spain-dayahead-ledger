@@ -16,12 +16,14 @@ resolution, detector added. Reviewed at month-ends. Seeded retroactively
 | 2026-08-20 | Artifact publish version conflict | machinery (409) | resynced baseline | n/a (artifact deprecated for Pages) |
 | 2026-08-21 | OTS manifests silently rewritten by same-day re-ticks; 12/13 proofs invalidated (live defect in ots_stamp) | machinery (independent auditor) | stamped originals restored from git history; stamp logic made immutable-per-slot | regression test test_ots_stamped_manifest_is_immutable* |
 | 2026-08-23 | ERCOT go-live: ercot.com 403s the Helsinki server (US-geo/datacenter block, whole domain); fetch-retry backoff also stalled the tick ~20min | machinery (live server seed run) | ERCOT de-scheduled from server_tick; DE unaffected; source alternatives under review | de-scheduled; per-market source reachability now checked at wire-time |
+| 2026-08-24 | The 2026-08-21 restoration was correct-but-incomplete: for 13 dates (2026-08-09 through 2026-08-21) the OTS-stamped `<date>.txt` anchors the FIRST daily tick's state, not that day's final settlement — the `<date>-2.txt` slot created during restoration holds the true final state but was never itself submitted to OpenTimestamps, so those 13 dates currently have no Bitcoin anchor of their final content. VERIFY.md's "every proof now matches" was an overclaim. No data is wrong (arithmetic re-verifies exactly); only the proof coverage is incomplete pre-2026-08-22, when ots_stamp began covering every slot on every tick. | machinery (independent auditor) | VERIFY.md corrected to state the actual coverage; whether to mint new proofs anchoring the current final state for those 13 dates is an evidentiary-claims decision left to the user | scripts/audit_ots_manifests.py + regression test (flags any written manifest slot with no matching .ots) |
 
-Escape rate: **5 of 9 incidents were escapes** (the 2026-08-21 OTS finding was caught by the Monday-auditor machinery — the closed loop's first win) (noticed
+Escape rate: **5 of 10 incidents were escapes** (the 2026-08-21 OTS finding was caught by the Monday-auditor machinery — the closed loop's first win) (noticed
 by a human or by an agent happening to look, not by machinery). This number
 is the justification for the closed-defect-loop apparatus — and the number
 the next 60 rolling days must drive to zero for the core to be declared
 reliable.
 
 Review findings (leak-guard clock hole, torn-write risk, etc.) are tracked
-in docs/BACKLOG.md, not here — this file is for things that FIRED.
+in the project's internal backlog (not part of this public mirror), not
+here — this file is for things that FIRED.

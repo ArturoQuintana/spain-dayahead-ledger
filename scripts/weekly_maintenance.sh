@@ -17,6 +17,11 @@ if ! uv run python scripts/crosscheck_routes.py; then
     >> Data/CROSSCHECK-ALERTS.log
 fi
 
+if ! uv run python scripts/audit_ots_manifests.py; then
+  echo "$(date -u +%FT%TZ) unstamped ots manifest(s) found" \
+    >> Data/OTS-GAPS.log
+fi
+
 for f in Data/ots/*.txt.ots; do
   [ -e "$f" ] || continue
   uvx --from opentimestamps-client ots upgrade "$f" || true

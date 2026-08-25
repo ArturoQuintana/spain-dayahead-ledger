@@ -24,7 +24,8 @@ rsync -a --delete --exclude __pycache__ tests/ "$MIRROR/tests/"
 rsync -a --delete --exclude __pycache__ scripts/ "$MIRROR/scripts/"
 cp VERIFY.md GOVERNANCE.md pyproject.toml uv.lock "$MIRROR/"
 for d in backtest-baselines-2015-2026.md ARCHITECTURE.md \
-         gate-analysis-plan.md gate-verdict-2026-08.md incidents.md; do
+         gate-analysis-plan.md gate-verdict-2026-08.md incidents.md \
+         research-track-records-2026-08.md; do
   cp "docs/$d" "$MIRROR/docs/" 2>/dev/null || true
 done
 cp README-public.md "$MIRROR/README.md"
