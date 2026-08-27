@@ -68,7 +68,7 @@ cross-market capture is in docs/backtest-markets-2026-08.md.
     tools/esios-fetcher/   route-B client (token, PriceDay contract, own tests)
     scripts/               server_tick, weekly_maintenance, publish_mirror,
                            render_dashboard, backtest, compare, crosscheck
-    tests/                 78 tests, failure-mode-first
+    tests/                 162 tests, failure-mode-first (see "Test suite" below)
     Data/                  the product (see Data flow)
 
 ## Call flow of one tick (loop.tick, via __main__.cmd_tick)
@@ -148,8 +148,8 @@ cross-market capture is in docs/backtest-markets-2026-08.md.
       month-end review    1st 08:00 UTC
       gate reminder       one-time 2026-09-04 — GBM v2 override window closes
     CI (GitHub Actions, on push/PR):
-      pytest -q  +  verify_ledger.py --all   (re-derives EVERY market's ledger;
-                                              a discrepancy fails the build)
+      pytest under a COVERAGE GATE  +  verify_ledger.py --all (re-derives EVERY
+      market's ledger; a discrepancy fails the build). See "Test suite" below.
     Branch protection:  main-protection ruleset — force-push + deletion blocked.
     Independent re-derivation (anyone can run it):
       scripts/verify_ledger.py --all [--verify-ots]  — recomputes every
@@ -160,6 +160,35 @@ cross-market capture is in docs/backtest-markets-2026-08.md.
       DE) runs it as its OWN workflow → the green "verify" badge in each mirror
       README is a live, anonymous check, not decoration. Private markets
       (IT/PT/ERCOT) are covered by the private CI's `--all`, not a public badge.
+
+## Test suite & coverage gate (updated 2026-08-27)
+
+Philosophy: FAILURE-MODE-FIRST. A test earns its place by failing the way a
+real bug (or bad actor) would — the leak guard refusing a late commit, a
+doctored P&L, a rewritten OTS manifest, a swallowed push error — not by
+confirming the happy path. 162 tests; `uv run pytest`.
+
+    Levels covered:
+      unit         pure functions — pnl_eur, pick_hours, kendall_tau,
+                   validate_prices, the sign-test binomial
+      integration  tick orchestration (commit→settle), multi-market isolation,
+                   cmd_tick/status/main dispatch, the digest, git_backup
+      contract     each fetcher's fetch_hourly replayed against a REAL recorded
+                   response (tests/fixtures/, captured 2026-08-20/27): ES
+                   apidatos ¼h→hourly, DE SMARD bucket, PT ENTSO-E A44, ERCOT
+                   MIS listing→zip→CSV. Pins the upstream shape a refactor could
+                   silently break; live drift is a separate smoke-test concern.
+      end-to-end   cmd_tick full pass through injection seams (_smtp/_urlopen/
+                   _run) — fetch→settle→commit→OTS→push→heartbeat→email
+
+    Coverage GATE (CI, --cov-fail-under, RATCHET: raise never lower):
+      floor 98% (2026-08-27) over the core package + every production-critical
+      script — loop.py (money/guards) ~99%, render_dashboard (public numbers),
+      verify_ledger (independent re-derivation), compare_strategies (R1
+      promotion test), crosscheck_routes (corruption guard), audit_ots_manifests
+      (OTS immutability). Config: pyproject [tool.coverage.run].
+      OMITTED (analysis-only, human-run, low blast radius): backtest_baselines,
+      backtest_markets, probe_signal.
 
 Deeper dives: VERIFY.md (outsider audit), docs/gate-analysis-plan.md
 (evaluation), docs/evolution-plan.md (how it advances), docs/incidents.md

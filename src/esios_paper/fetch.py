@@ -17,18 +17,22 @@ API = ("https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real"
 CHUNK_DAYS = 28
 
 
-def fetch_hourly(start: date, end: date) -> dict[str, float]:
+def fetch_hourly(start: date, end: date, *,
+                 _open=urllib.request.urlopen) -> dict[str, float]:
     """Hourly mean spot prices for [start, end] (inclusive), {ts_hour: price}.
     Days the market hasn't published yet are simply absent from the result.
     Raises on network/HTTP errors — the caller decides whether stale data is
     acceptable for its purpose (settlement can wait; commitment must not guess).
+    `_open` is the urlopen seam (injected in contract tests, matching the
+    sibling fetchers). The API serves quarter-hourly values even with
+    time_trunc=hour; they are aggregated to the hourly mean here.
     """
     out: dict[str, list[float]] = defaultdict(list)
     cur = start
     while cur <= end:
         chunk_end = min(cur + timedelta(days=CHUNK_DAYS - 1), end)
         url = API.format(s=cur.isoformat(), e=chunk_end.isoformat())
-        with urllib.request.urlopen(url, timeout=60) as r:
+        with _open(url, timeout=60) as r:
             data = json.load(r)
         spot = next((i for i in data.get("included", [])
                      if "spot" in i["attributes"]["title"].lower()), None)

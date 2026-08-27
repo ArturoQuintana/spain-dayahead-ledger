@@ -41,3 +41,25 @@ def test_fully_stamped_directory_has_no_gaps(tmp_path):
     gaps = audit_ots_manifests.find_unstamped(tmp_path, today="2026-08-24")
 
     assert gaps == []
+
+
+def test_main_no_ots_dir_is_clean(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(audit_ots_manifests, "OTS_DIR", tmp_path / "absent")
+    assert audit_ots_manifests.main() == 0
+    assert "absent" in capsys.readouterr().out
+
+
+def test_main_all_stamped_returns_zero(tmp_path, monkeypatch, capsys):
+    (tmp_path / "2020-01-01.txt").write_text("state\n")       # past date, not today
+    (tmp_path / "2020-01-01.txt.ots").write_bytes(b"proof")
+    monkeypatch.setattr(audit_ots_manifests, "OTS_DIR", tmp_path)
+    assert audit_ots_manifests.main() == 0
+    assert "every non-today manifest is stamped" in capsys.readouterr().out
+
+
+def test_main_reports_gaps_and_returns_one(tmp_path, monkeypatch, capsys):
+    (tmp_path / "2020-01-01.txt").write_text("never stamped\n")   # no .ots sibling
+    monkeypatch.setattr(audit_ots_manifests, "OTS_DIR", tmp_path)
+    assert audit_ots_manifests.main() == 1
+    out = capsys.readouterr().out
+    assert "written but never stamped" in out and "2020-01-01.txt" in out
