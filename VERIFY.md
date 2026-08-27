@@ -78,6 +78,23 @@ capture = pnl / oracle_pnl. The exact code is `src/esios_paper/loop.py`
 (pure functions, unit-tested: `uv run pytest`). The independent second price
 route is cross-checked weekly (`scripts/crosscheck_routes.py`).
 
+**One command that does all of the above for you:**
+
+    uv run python scripts/verify_ledger.py --all [--verify-ots]
+
+`scripts/verify_ledger.py` re-derives EVERY settlement from `prices.json` and
+each receipt's own recorded params — from scratch, importing nothing from the
+project's own code, so a bug in our P&L path cannot hide in the checker — and
+diffs it against `ledger.jsonl` line by line. It also re-checks the leak guard
+(every receipt's `committed_at` predates its target day), the append-only
+property (each anchored OTS manifest's SHA-256 must match a prefix of the
+current file — a rewritten history matches nothing and FAILs), and reports how
+many receipts are Bitcoin-covered. Exit code 0 = every check passed. It ships
+with its own tamper tests (`tests/test_verify_ledger.py`): the checker is
+proven to FAIL on a doctored P&L, altered hours, a leaked receipt, an orphan
+settlement, and a rewritten manifest — a re-derivation that cannot fail proves
+nothing.
+
 ## 3. The no-cherry-picking claim
 
 Both audit files are append-only: every receipt ever committed has a

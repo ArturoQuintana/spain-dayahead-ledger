@@ -30,6 +30,11 @@ for d in backtest-baselines-2015-2026.md ARCHITECTURE.md \
   cp "docs/$d" "$MIRROR/docs/" 2>/dev/null || true
 done
 cp README-public.md "$MIRROR/README.md"
+# The mirror runs its OWN verify workflow so the README badge is a real,
+# anonymously-verifiable check on GitHub's infra (deploy keys may push workflow
+# files; PATs without `workflow` scope may not — we push via the mirror's key).
+mkdir -p "$MIRROR/.github/workflows"
+cp mirror/verify.yml "$MIRROR/.github/workflows/verify.yml"
 
 cd "$MIRROR"
 if [ -n "$(git status --porcelain)" ]; then

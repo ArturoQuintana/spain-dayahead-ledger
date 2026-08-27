@@ -1,0 +1,22 @@
+# Runs ON THE PUBLIC MIRROR (spain-dayahead-ledger), not the private repo, so
+# the green badge in the README is a real, anonymously-verifiable check: GitHub's
+# own infra independently re-derives every settlement in this repo from the raw
+# prices + receipts and fails if anything doesn't reconcile. verify_ledger.py is
+# stdlib-only, so no dependency install is needed. Copied here each publish by
+# scripts/publish_mirror.sh in the private operations repo.
+name: verify
+on:
+  push:
+  schedule:
+    - cron: "0 6 * * *"   # daily — a continuously running demonstration
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Independently re-derive the ledger from raw prices + receipts
+        run: python3 scripts/verify_ledger.py --all
