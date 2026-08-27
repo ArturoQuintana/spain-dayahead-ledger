@@ -339,7 +339,7 @@ def test_cmd_tick_silent_market_skips_heartbeat_email_git_ots(monkeypatch):
         monkeypatch.setattr(cli, name, lambda *a, n=name, **k: calls.append(n))
     rc = cli.cmd_tick("de")
     assert rc == 0
-    assert calls == []                       # no ES-only side effects for a silent market
+    assert calls == ["ots_stamp"]            # silent markets OTS-anchor, but skip heartbeat/email/git
     # ES path still fires them
     monkeypatch.setattr(cli, "tick", lambda **kw: {
         "date": "2026-08-22", "target": "2026-08-23", "settled": [],
@@ -398,6 +398,26 @@ def test_ots_stamped_manifest_is_immutable_second_tick_gets_new_slot(
     assert not (tmp_path / "ots" / "2026-08-21-3.txt").exists()
 
 
+def test_ots_per_market_stamps_own_dir(monkeypatch, tmp_path):
+    """DE OTS: silent markets anchor into their own Data/<slug>/ots with their
+    own receipts/ledger, not the ES globals."""
+    from pathlib import Path
+    import esios_paper.__main__ as cli
+    (tmp_path / "de").mkdir()
+    (tmp_path / "de" / "receipts.jsonl").write_text('{"t": "de"}\n')
+    (tmp_path / "de" / "ledger.jsonl").write_text('{"t": "de"}\n')
+    def fake_stamp(cmd, **kw):
+        Path(cmd[-1] + ".ots").write_bytes(b"proof")
+        class R: returncode = 0; stderr = ""; stdout = ""
+        return R()
+    cli.ots_stamp("2026-08-27", ots_dir=tmp_path / "de" / "ots",
+                  receipts=tmp_path / "de" / "receipts.jsonl",
+                  ledger=tmp_path / "de" / "ledger.jsonl", _run=fake_stamp)
+    assert (tmp_path / "de" / "ots" / "2026-08-27.txt.ots").exists()
+    man = (tmp_path / "de" / "ots" / "2026-08-27.txt").read_text()
+    assert "sha256(receipts.jsonl)=" in man and "absent" not in man
+
+
 def test_ots_stamp_failure_never_raises(monkeypatch, tmp_path):
     import esios_paper.__main__ as cli
     monkeypatch.setattr(cli, "RECEIPTS", tmp_path / "receipts.jsonl")
@@ -451,7 +471,7 @@ def test_digest_includes_silent_markets(monkeypatch, tmp_path):
         "target": "2026-08-27", "strategy": loop.STRATEGY,
         "pnl_eur": 301.40, "oracle_pnl_eur": 301.40, "capture": 1.0}) + "\n")
     subject, body = cli.build_digest()
-    assert "[DE silent]" in body and "+301.40" in body
+    assert "[DE public]" in body and "+301.40" in body
     # IT absent (no ledger) -> no IT section
     assert "[IT silent]" not in body
 

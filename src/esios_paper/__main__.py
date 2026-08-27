@@ -123,14 +123,16 @@ def build_digest() -> tuple[str, str] | None:
         last_t = max(e["target"] for e in mp)
         le = next(e for e in mp if e["target"] == last_t)
         mcaps = [e["capture"] for e in mp if e.get("capture") is not None]
+        tag = {"de": "DE public"}.get(slug, f"{slug.upper()} silent")
         lines.append("")
         lines.append(
-            f"[{slug.upper()} silent] {len(mp)} days | total {sum(e['pnl_eur'] for e in mp):+.2f} | "
+            f"[{tag}] {len(mp)} days | total {sum(e['pnl_eur'] for e in mp):+.2f} | "
             f"mean capture {statistics.fmean(mcaps) * 100:.1f}% | "
             f"latest {last_t}: {le['pnl_eur']:+.2f} (cap {le.get('capture')})")
     lines.append("")
-    lines.append("Paper money, upper bound (exchange fees only). "
-                 "Full ledger: arturoquintana.github.io/spain-dayahead-ledger")
+    lines.append("Paper money, upper bound (exchange fees only).")
+    lines.append("Dashboards: Spain arturoquintana.github.io/spain-dayahead-ledger"
+                 " · Germany arturoquintana.github.io/germany-dayahead-ledger")
     return subject, "\n".join(lines)
 
 
@@ -177,27 +179,36 @@ def email_digest(summary: dict, *, _smtp=smtplib.SMTP) -> None:
         print(f"[esios-paper] digest email FAILED (non-fatal): {exc}")
 
 
-def ots_manifest(label: str) -> str:
-    """Text manifest binding the audit trail's current state: sha256 of the
-    receipts and ledger files. Stamping this (OpenTimestamps) proves the
-    receipts existed BEFORE the auction published — trustlessly, unlike git
-    host timestamps. Pure text builder, unit-tested."""
+def ots_manifest(label: str, receipts: Path | None = None,
+                 ledger: Path | None = None) -> str:
+    """Text manifest binding one market's audit trail: sha256 of its receipts
+    and ledger files. Stamping this (OpenTimestamps) proves the receipts
+    existed BEFORE the auction published — trustlessly, unlike git host
+    timestamps. Pure text builder, unit-tested. Defaults to the ES globals
+    (resolved at call time so tests can monkeypatch them)."""
+    receipts, ledger = receipts or RECEIPTS, ledger or LEDGER
     lines = [f"esios-paper audit manifest {label}"]
-    for path in (RECEIPTS, LEDGER):
+    for path in (receipts, ledger):
         digest = (hashlib.sha256(path.read_bytes()).hexdigest()
                   if path.exists() else "absent")
         lines.append(f"sha256({path.name})={digest}")
     return "\n".join(lines) + "\n"
 
 
-def ots_stamp(label: str, *, _run=subprocess.run) -> None:
-    """Write Data/ots/<label>.txt and stamp it via the canonical OTS client
-    (through uvx, so the project itself stays stdlib-only). The .txt + .ots
-    proof ride the same git backup as the data they attest. Best effort by
-    design: a calendar/network failure must never fail the tick."""
+def ots_stamp(label: str, *, ots_dir: Path | None = None,
+              receipts: Path | None = None, ledger: Path | None = None,
+              _run=subprocess.run) -> None:
+    """Write <ots_dir>/<label>.txt and stamp it via the canonical OTS client
+    (through uvx, so the project stays stdlib-only). The .txt + .ots proof
+    ride the same git backup as the data they attest. Best effort: a
+    calendar/network failure must never fail the tick. Per-market: ES uses
+    the defaults; silent markets pass their own Data/<slug>/ots + files
+    (defaults resolved at call time so tests can monkeypatch)."""
+    ots_dir = ots_dir or OTS_DIR
+    receipts, ledger = receipts or RECEIPTS, ledger or LEDGER
     try:
-        OTS_DIR.mkdir(parents=True, exist_ok=True)
-        content = ots_manifest(label)
+        ots_dir.mkdir(parents=True, exist_ok=True)
+        content = ots_manifest(label, receipts, ledger)
         # A STAMPED MANIFEST IS IMMUTABLE. The pre-2026-08-21 version
         # rewrote <date>.txt on every pass and skipped stamping when a proof
         # existed — so the second tick of a day (post-settlement hashes)
@@ -205,7 +216,7 @@ def ots_stamp(label: str, *, _run=subprocess.run) -> None:
         # 2026-08-21). Now: if the audit trail moved after a stamp, the new
         # state gets a NEW suffixed manifest; stamped pairs are never touched.
         for n in range(1, 25):
-            manifest = OTS_DIR / (f"{label}.txt" if n == 1
+            manifest = ots_dir / (f"{label}.txt" if n == 1
                                   else f"{label}-{n}.txt")
             proof = manifest.with_suffix(".txt.ots")
             if proof.exists():
@@ -278,8 +289,13 @@ def cmd_tick(market_slug: str | None = None) -> int:
             print(f"unknown market {market_slug!r}; use: "
                   f"{', '.join(MARKETS)}")
             return 2
-        s = tick(market=MARKETS[market_slug])
+        m = MARKETS[market_slug]
+        s = tick(market=m)
         _print_summary(s, f"esios-paper:{market_slug}")
+        # OTS-anchor this market's audit trail into its own Data/<slug>/ots
+        # (rides the ES tick's git_backup). No heartbeat/email/push here.
+        ots_stamp(s["date"], ots_dir=m.ledger_path.parent / "ots",
+                  receipts=m.receipts_path, ledger=m.ledger_path)
         print(f"[esios-paper:{market_slug}] tick done "
               f"{json.dumps({k: v if isinstance(v, (str, bool)) else bool(v) for k, v in s.items()})}")
         return 0
