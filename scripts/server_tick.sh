@@ -15,7 +15,7 @@ git pull --ff-only || echo "[esios-paper] pre-tick pull failed (continuing on lo
 # Helsinki server (US-geo/datacenter block on the whole domain — DE/SMARD is
 # fine). Left in the loop it also stalls every tick ~20min via fetch retries.
 # Re-add once an EU-reachable ERCOT source lands (incident 2026-08-23).
-for m in de it; do
+for m in de it pt; do
   uv run python -m esios_paper tick --market "$m" \
     || echo "[esios-paper] $m tick failed (non-fatal, silent market)"
 done

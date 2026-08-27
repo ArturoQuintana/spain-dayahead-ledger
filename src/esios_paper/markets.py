@@ -34,5 +34,14 @@ ERCOT = Market.make("ercot", "America/Chicago",
 IT = Market.make("it", "Europe/Rome", fetch_entsoe.fetch_hourly,
                  deadline_hour=12, currency="EUR")
 
+# Portugal (PT zone): the OTHER half of MIBEL. ES and PT prices are coupled
+# but DIVERGE on congestion-split days — so PT is tracked as its own market
+# with real PT-zone prices (ENTSO-E), NOT an ES relabel. Europe/Lisbon (WET,
+# one hour behind Madrid). Derived-only like Italy (ENTSO-E day-ahead not
+# freely redistributable) -> PRIVATE/silent, excluded from the public mirror.
+PT = Market.make("pt", "Europe/Lisbon",
+                 fetch_entsoe.make_fetch(fetch_entsoe.PT, fetch_entsoe.LISBON),
+                 deadline_hour=12, currency="EUR")
+
 # Registry by slug.
-MARKETS = {m.slug: m for m in (ES, DE, ERCOT, IT)}
+MARKETS = {m.slug: m for m in (ES, DE, ERCOT, IT, PT)}

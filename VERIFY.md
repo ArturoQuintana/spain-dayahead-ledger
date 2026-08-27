@@ -67,7 +67,7 @@ WEEKLY by design — staleness under 7 days is normal.
 ## 2. The arithmetic claim (P&L follows from receipts + public prices)
 
 Prices are public: apidatos.ree.es (no key) or api.esios.ree.es (free key),
-both derived from the OMIE auction (Spanish/ES zone; under MIBEL, Portuguese/PT prices match except on rare congestion splits). For any settled day:
+both derived from the OMIE auction. For any settled day:
 
     pnl = sum(price[h] for h in sell_hours) * 1.0 MW * 0.85
         - sum(price[h] for h in buy_hours) * 1.0 MW

@@ -26,12 +26,10 @@ GATE_DAYS = 21
 # Per-market presentation. ES is the default and keeps the public page
 # byte-identical; other markets override the labels and drop the ES-only gate.
 MARKETS = {
-    "es": {"data": DATA, "title": "Iberian (MIBEL) day-ahead battery arbitrage",
+    "es": {"data": DATA, "title": "Spanish day-ahead battery arbitrage",
            "tzlabel": "Madrid", "gate": True,
-           "source": "apidatos.ree.es (Spanish/ES zone; under MIBEL, "
-                     "Portuguese/PT prices match except on rare congestion "
-                     "splits),\n      cross-checked weekly against the "
-                     "independent token ESIOS route"},
+           "source": "apidatos.ree.es,\n      cross-checked weekly against "
+                     "the independent token ESIOS route"},
     "de": {"data": DATA / "de", "title": "German (DE-LU) day-ahead battery arbitrage",
            "tzlabel": "Berlin", "gate": False,
            "source": "Bundesnetzagentur | SMARD.de (CC BY 4.0)"},
@@ -207,7 +205,7 @@ def build(slug: str = "es") -> str:
         gate_section = ""
 
     return TEMPLATE % {
-        "tabtitle": {"es": "Iberia", "de": "Germany", "it": "Italy"}[slug]
+        "tabtitle": {"es": "Spain", "de": "Germany", "it": "Italy"}[slug]
                     + " day-ahead ledger",
         "title": cfg["title"],
         "source": cfg.get("source", "apidatos.ree.es"),

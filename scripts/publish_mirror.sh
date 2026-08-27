@@ -18,7 +18,7 @@ mkdir -p "$MIRROR/docs"
 # (hard gate, docs/shadow-ledgers-*.md) — Italy additionally needs price
 # redaction. Exclude every per-market subdir; ES lives in Data/ root files.
 rsync -a --delete --exclude __pycache__ \
-  --exclude 'de/' --exclude 'ercot/' --exclude 'it/' \
+  --exclude 'de/' --exclude 'ercot/' --exclude 'it/' --exclude 'pt/' \
   Data/ "$MIRROR/Data/"
 rsync -a --delete --exclude __pycache__ src/ "$MIRROR/src/"
 rsync -a --delete --exclude __pycache__ tests/ "$MIRROR/tests/"

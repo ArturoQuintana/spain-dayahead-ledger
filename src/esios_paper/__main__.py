@@ -113,7 +113,7 @@ def build_digest() -> tuple[str, str] | None:
                f"esios digest {latest} · "
                f"{(prime or {}).get('pnl_eur', 0):+.0f} € · {wins}/{len(prim)}")
     # Silent shadow markets (DE/IT) — private, this email only (never published).
-    for slug in ("de", "it"):
+    for slug in ("de", "it", "pt", "ercot"):
         mrows = _load_jsonl(DATA_DIR / slug / "ledger.jsonl")
         if not mrows:
             continue
@@ -131,7 +131,7 @@ def build_digest() -> tuple[str, str] | None:
             f"latest {last_t}: {le['pnl_eur']:+.2f} (cap {le.get('capture')})")
     lines.append("")
     lines.append("Paper money, upper bound (exchange fees only).")
-    lines.append("Dashboards: Iberia arturoquintana.github.io/spain-dayahead-ledger"
+    lines.append("Dashboards: Spain arturoquintana.github.io/spain-dayahead-ledger"
                  " · Germany arturoquintana.github.io/germany-dayahead-ledger")
     return subject, "\n".join(lines)
 
