@@ -6,6 +6,7 @@
 # server scripts) never leave the private repo.
 set -uo pipefail
 cd "$(dirname "$0")/.."
+REPO="$(pwd)"
 export PATH="$HOME/.local/bin:$PATH"
 MIRROR="${MIRROR_DIR:-$HOME/ledger-mirror}"
 [ -d "$MIRROR/.git" ] || { echo "[mirror] $MIRROR not initialized; skipping"; exit 0; }
@@ -41,7 +42,7 @@ fi
 
 # --- Germany public mirror (DE data IS redistributable: SMARD CC BY 4.0) ---
 # DE is git-attested (not yet OTS-anchored); disclosed in its VERIFY.
-cd "$(dirname "$0")/.."
+cd "$REPO"
 DEMIR="${DE_MIRROR_DIR:-$HOME/de-mirror}"
 if [ -d "$DEMIR/.git" ] && [ -d Data/de ]; then
   uv run python scripts/render_dashboard.py --market de "$DEMIR/index.html"
