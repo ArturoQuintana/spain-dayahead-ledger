@@ -1,19 +1,41 @@
 # Architecture
 
-What this application does: every day, BEFORE Spain's day-ahead auction
-publishes tomorrow's electricity prices (~13:15 CET), it commits immutable
-"receipts" recording how three pre-registered strategies would trade a
-virtual 1 MW / 2 MWh battery; after publication it settles those receipts
-against the real prices, appends money-denominated results to an
-append-only ledger, anchors everything in Bitcoin via OpenTimestamps, and
-republishes a public, auditable dashboard. It is a measurement instrument:
-the product is a track record that cannot be faked, revised, or cherry-
-picked. Governance (who may change what, and how claims are verified) is in
-CLAUDE.md; outsider verification in VERIFY.md.
+What this application does: every day, BEFORE a day-ahead auction publishes
+tomorrow's electricity prices, it commits immutable "receipts" recording how a
+panel of pre-registered strategies would trade a virtual 1 MW / 2 MWh battery;
+after publication it settles those receipts against the real prices, appends
+money-denominated results to an append-only ledger, anchors everything in
+Bitcoin via OpenTimestamps, and republishes a public, auditable dashboard. It
+is a measurement instrument: the product is a track record that cannot be
+faked, revised, or cherry-picked. Spain is the primary market; the same loop
+now runs five markets (see "Markets" below). Governance (who may change what,
+and how claims are verified) is in CLAUDE.md; outsider verification in
+VERIFY.md.
+
+## Markets (updated 2026-08-27)
+
+The loop is market-agnostic (a frozen `Market` dataclass parameterizes zone,
+timezone, commit deadline, currency, Data/<slug>/ tree, and fetch client — the
+strategy panel, P&L math, and guards are shared). Five markets run today:
+
+    market  zone      source / license               cur  deadline  writer        public tier
+    ES      Spain     apidatos.ree.es · public        EUR  13:00     server        Pages + Bitcoin-OTS
+    DE      DE-LU     SMARD.de · CC BY 4.0            EUR  12:00     server        Pages + OTS
+    IT      IT-SUD    ENTSO-E A44 · token, derived    EUR  12:00     server        private (license)
+    PT      PT        ENTSO-E A44 · token, derived    EUR  12:00     server        private (license)
+    ERCOT   HB_NORTH  ERCOT MIS NP4-190 · public/redist USD 10:00    GitHub Actions private + OTS
+
+Two writers, not one: the server writes ES/DE/IT/PT; ERCOT is driven from
+GitHub Actions US runners (ERCOT DAM geo-blocks EU IPs). Both push directly to
+`main`; the `main-protection` ruleset blocks force-push and branch deletion so
+the append-only trail cannot be rewritten. IT/PT are private because ENTSO-E
+day-ahead is not freely redistributable (derived-metrics-only if ever
+published); ERCOT is redistributable and could go public later. Historical
+cross-market capture is in docs/backtest-markets-2026-08.md.
 
 ## Components
 
-    ┌────────────────────────── Hetzner VPS (sole writer) ──────────────────────────┐
+    ┌──────────────── Hetzner VPS (primary writer; ERCOT via GitHub Actions) ────────┐
     │ systemd timers                                                                │
     │  esios-tick.timer      11:00 / 12:30 / 17:00 Europe/Madrid → server_tick.sh   │
     │  esios-ots-upgrade     Sun 12:00 Madrid → weekly_maintenance.sh               │
@@ -46,7 +68,7 @@ CLAUDE.md; outsider verification in VERIFY.md.
     tools/esios-fetcher/   route-B client (token, PriceDay contract, own tests)
     scripts/               server_tick, weekly_maintenance, publish_mirror,
                            render_dashboard, backtest, compare, crosscheck
-    tests/                 52 tests, failure-mode-first
+    tests/                 78 tests, failure-mode-first
     Data/                  the product (see Data flow)
 
 ## Call flow of one tick (loop.tick, via __main__.cmd_tick)
@@ -96,9 +118,12 @@ CLAUDE.md; outsider verification in VERIFY.md.
     persistence v1 (PRIMARY)  basis = yesterday's profile
     climatology v1 (shadow)   basis = per-hour mean of trailing 28 complete days
     rankblend  v1 (shadow)    basis = mean of the two legs' per-hour ranks
+    weekly     v1 (shadow)    basis = same hour last week, p(d-7,h) — the EPF
+                              literature's canonical naive (registered 08-22)
     Adding one = one registry entry + basis_fn. Promotion/retirement are
     mechanical (CLAUDE.md rules R1/R7). Settlement math never changes per
-    strategy — comparability is the point.
+    strategy — comparability is the point. Live per-strategy P&L/capture is not
+    frozen here — it lives in the ledger, `... status`, and the dashboards.
 
 ## Failure paths (designed, tested)
 
@@ -112,6 +137,29 @@ CLAUDE.md; outsider verification in VERIFY.md.
                            docs; restore drill proven from GitHub alone
     silent corruption    → weekly two-route cross-check + Monday auditor
                            recomputing everything from public data
+
+## Automation & verification (updated 2026-08-27)
+
+    Cloud routines (claude.ai, Gmail/push-notified):
+      daily digest        ~16:35 UTC — ledger email
+      Monday auditor      07:00 UTC  — fresh-context, READ-ONLY (never writes)
+      Monday resolver     09:00 UTC  — fixes audit findings, auto-merges GREEN
+                                       PRs (CI-gated), escalates gated items
+      month-end review    1st 08:00 UTC
+      gate reminder       one-time 2026-09-04 — GBM v2 override window closes
+    CI (GitHub Actions, on push/PR):
+      pytest -q  +  verify_ledger.py --all   (re-derives EVERY market's ledger;
+                                              a discrepancy fails the build)
+    Branch protection:  main-protection ruleset — force-push + deletion blocked.
+    Independent re-derivation (anyone can run it):
+      scripts/verify_ledger.py --all [--verify-ots]  — recomputes every
+      settlement from raw prices + each receipt's own params (imports nothing
+      from the package), re-checks the leak guard, proves append-only via the
+      OTS-manifest prefix hashes, reports Bitcoin coverage. Tamper-tested
+      (tests/test_verify_ledger.py). It runs in CI, and each PUBLIC mirror (ES,
+      DE) runs it as its OWN workflow → the green "verify" badge in each mirror
+      README is a live, anonymous check, not decoration. Private markets
+      (IT/PT/ERCOT) are covered by the private CI's `--all`, not a public badge.
 
 Deeper dives: VERIFY.md (outsider audit), docs/gate-analysis-plan.md
 (evaluation), docs/evolution-plan.md (how it advances), docs/incidents.md

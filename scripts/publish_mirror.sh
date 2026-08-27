@@ -55,9 +55,14 @@ if [ -d "$DEMIR/.git" ] && [ -d Data/de ]; then
   rsync -a --delete --exclude __pycache__ Data/de/ "$DEMIR/Data/"
   rsync -a --delete --exclude __pycache__ src/ "$DEMIR/src/"
   rsync -a --delete --exclude __pycache__ tests/ "$DEMIR/tests/"
+  rsync -a --delete --exclude __pycache__ scripts/ "$DEMIR/scripts/"
   cp GOVERNANCE.md pyproject.toml uv.lock "$DEMIR/"
   cp README-de.md "$DEMIR/README.md"
   cp VERIFY-de.md "$DEMIR/VERIFY.md"
+  # Same real, anonymously-verifiable green badge as the ES mirror: the DE repo
+  # re-derives its own ledger with verify_ledger.py on GitHub's infra.
+  mkdir -p "$DEMIR/.github/workflows"
+  cp mirror/verify.yml "$DEMIR/.github/workflows/verify.yml"
   cd "$DEMIR"
   if [ -n "$(git status --porcelain)" ]; then
     git add -A && git commit -q -m "DE ledger update $(date -u +%FT%TZ)"
