@@ -19,8 +19,24 @@ DATA = ROOT / "Data"
 PRIMARY = "battery-2h2h-persistence"
 NAMES = {"battery-2h2h-persistence": "Persistence v1",
          "battery-2h2h-climatology": "Climatology v1",
-         "battery-2h2h-rankblend": "Rank-blend v1"}
+         "battery-2h2h-rankblend": "Rank-blend v1",
+         "battery-2h2h-weekly": "Weekly v1"}
 GATE_DAYS = 21
+
+# Per-market presentation. ES is the default and keeps the public page
+# byte-identical; other markets override the labels and drop the ES-only gate.
+MARKETS = {
+    "es": {"data": DATA, "title": "Spanish day-ahead battery arbitrage",
+           "tzlabel": "Madrid", "gate": True,
+           "source": "apidatos.ree.es,\n      cross-checked weekly against "
+                     "the independent token ESIOS route"},
+    "de": {"data": DATA / "de", "title": "German (DE-LU) day-ahead battery arbitrage",
+           "tzlabel": "Berlin", "gate": False,
+           "source": "Bundesnetzagentur | SMARD.de (CC BY 4.0)"},
+    "it": {"data": DATA / "it", "title": "Italian (IT-SUD) day-ahead battery arbitrage",
+           "tzlabel": "Rome", "gate": False,
+           "source": "ENTSO-E (private use; prices not redistributed)"},
+}
 
 
 def jsonl(p: Path) -> list[dict]:
@@ -29,9 +45,9 @@ def jsonl(p: Path) -> list[dict]:
     return [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
 
 
-def day_curves() -> dict[str, list[float | None]]:
+def day_curves(data: Path = DATA) -> dict[str, list[float | None]]:
     by: dict[str, dict[int, float]] = {}
-    for r in json.loads((DATA / "prices.json").read_text()):
+    for r in json.loads((data / "prices.json").read_text()):
         d, h = r["ts"].split("T")
         by.setdefault(d, {})[int(h)] = r["price"]
     return {d: [v.get(h) for h in range(24)] for d, v in by.items()}
@@ -41,10 +57,12 @@ def fmt(x: float) -> str:
     return f"{x:,.2f}"
 
 
-def build() -> str:
+def build(slug: str = "es") -> str:
+    cfg = MARKETS[slug]
+    DATA = cfg["data"]
     ledger = jsonl(DATA / "ledger.jsonl")
     receipts = jsonl(DATA / "receipts.jsonl")
-    curves = day_curves()
+    curves = day_curves(DATA)
     now = datetime.now(ZoneInfo("Europe/Madrid"))
 
     prim = [e for e in ledger if e["strategy"] == PRIMARY]
@@ -165,16 +183,37 @@ def build() -> str:
                      '</span><span class="oc">Next commit at the next 11:00 '
                      'Europe/Madrid tick.</span></div>']
 
-    gate_cells = "".join(
-        f'<i class="{"done" if i < len(prim) else ""}"></i>'
-        for i in range(GATE_DAYS))
+    if cfg["gate"]:
+        gate_cells = "".join(f'<i class="{"done" if i < len(prim) else ""}"></i>'
+                             for i in range(GATE_DAYS))
+        gate_tile = (
+            '<div class="tile"><div class="k">GBM v2 gate</div>'
+            f'<div class="v">{min(len(prim), GATE_DAYS)} / {GATE_DAYS}</div>'
+            '<div class="s">settled days · evaluate ~21 Aug</div></div>')
+        gate_section = (
+            '<h2>Escalation gate</h2><div class="gate">'
+            '<div class="gl"><span>Progress to the GBM&nbsp;v2 evaluation</span>'
+            f'<span class="m">{min(len(prim), GATE_DAYS)} of {GATE_DAYS} settled days</span></div>'
+            f'<div class="gate-cells">{gate_cells}</div>'
+            '<div class="gl"><span>Evaluation criteria frozen in advance; stop '
+            'conditions pre-registered</span><span class="m">~21 Aug 2026</span></div></div>')
+    else:
+        gate_tile = (
+            '<div class="tile"><div class="k">Market</div>'
+            f'<div class="v">{slug.upper()}</div>'
+            '<div class="s">silent shadow ledger</div></div>')
+        gate_section = ""
 
     return TEMPLATE % {
-        "asof": now.strftime("%Y-%m-%d %H:%M Madrid"),
+        "tabtitle": {"es": "Spain", "de": "Germany", "it": "Italy"}[slug]
+                    + " day-ahead ledger",
+        "title": cfg["title"],
+        "source": cfg.get("source", "apidatos.ree.es"),
+        "asof": now.strftime(f"%Y-%m-%d %H:%M {cfg['tzlabel']}"),
         "total": fmt(total), "oracle_total": fmt(oracle_total),
         "cap_mean": f"{cap_mean:.1f}", "wins": wins, "n": len(prim),
-        "missed_n": len(missed), "gate_n": min(len(prim), GATE_DAYS),
-        "gate_days": GATE_DAYS, "gate_cells": gate_cells,
+        "missed_n": len(missed),
+        "gate_tile": gate_tile, "gate_section": gate_section,
         "days_json": json.dumps(days_js),
         "open_cards": "\n".join(open_html),
         "h2h_head": h2h_head, "h2h_rows": "\n".join(h2h_rows),
@@ -184,7 +223,7 @@ def build() -> str:
     }
 
 
-TEMPLATE = """<title>esios-paper · ledger</title>
+TEMPLATE = """<title>%(tabtitle)s</title>
 <style>
   :root { color-scheme: light;
     --bg:#f9f9f7; --card:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e;
@@ -267,7 +306,7 @@ TEMPLATE = """<title>esios-paper · ledger</title>
 <div class="wrap">
   <header>
     <p class="eyebrow">esios-paper · paper-trading ledger</p>
-    <h1>Spanish day-ahead battery arbitrage</h1>
+    <h1>%(title)s</h1>
     <p class="asof">1 MW / 2 MWh virtual battery · decisions committed before price publication
       (leak-guarded, OpenTimestamps-anchored) · data as of <code>%(asof)s</code> ·
       generated from the audit files, no hand-edited numbers</p>
@@ -283,9 +322,7 @@ TEMPLATE = """<title>esios-paper · ledger</title>
     <div class="tile"><div class="k">Record</div>
       <div class="v">%(wins)s / %(n)s</div>
       <div class="s">winning settled days · %(missed_n)s missed</div></div>
-    <div class="tile"><div class="k">GBM v2 gate</div>
-      <div class="v">%(gate_n)s / %(gate_days)s</div>
-      <div class="s">settled days · evaluate ~21 Aug</div></div>
+    %(gate_tile)s
   </div>
 
   <h2>Settled days · primary strategy</h2>
@@ -305,14 +342,7 @@ TEMPLATE = """<title>esios-paper · ledger</title>
     see VERIFY.md. All %(n_strategies)s strategies settle on identical days
     with identical costs; none can be revised after the fact.</p>
 
-  <h2>Escalation gate</h2>
-  <div class="gate">
-    <div class="gl"><span>Progress to the GBM&nbsp;v2 evaluation</span>
-      <span class="m">%(gate_n)s of %(gate_days)s settled days</span></div>
-    <div class="gate-cells">%(gate_cells)s</div>
-    <div class="gl"><span>Evaluation criteria frozen in advance; stop
-      conditions pre-registered</span><span class="m">~21 Aug 2026</span></div>
-  </div>
+  %(gate_section)s
 
   <h2>Ledger · append-only · primary</h2>
   <div class="tbl-wrap"><table>
@@ -330,8 +360,7 @@ TEMPLATE = """<title>esios-paper · ledger</title>
       Kendall tau-b of the committed forecast vs the actual day.</p>
     <p>Paper money — no capital at stake. Every receipt is committed and
       pushed before the D+1 auction publishes (~13:15 CET); the ledger is
-      append-only and OpenTimestamps-anchored; prices: apidatos.ree.es,
-      cross-checked weekly against the independent token ESIOS route.
+      append-only and OpenTimestamps-anchored; prices: %(source)s.
       Absolute EUR is an <b>upper bound</b> (exchange fees only — no grid
       charges, taxes, or aggregator margin); relative metrics are robust.
       Verify everything yourself: see VERIFY.md in this repository.</p>
@@ -438,11 +467,18 @@ TEMPLATE = """<title>esios-paper · ledger</title>
 
 
 def main() -> None:
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "site" / "index.html"
+    args = [a for a in sys.argv[1:]]
+    slug = "es"
+    if "--market" in args:
+        i = args.index("--market")
+        slug = args[i + 1]
+        del args[i:i + 2]
+    out = Path(args[0]) if args else ROOT / ("site/index.html" if slug == "es"
+                                             else f"site/{slug}.html")
     out.parent.mkdir(parents=True, exist_ok=True)
     html = "<!doctype html><html><head><meta charset=\"utf-8\">" \
            "<meta name=\"viewport\" content=\"width=device-width," \
-           "initial-scale=1\"></head><body>" + build() + "</body></html>"
+           "initial-scale=1\"></head><body>" + build(slug) + "</body></html>"
     out.write_text(html)
     print(f"rendered {out} ({len(html)} bytes)")
 

@@ -444,6 +444,18 @@ def test_digest_builds_settlement_race_and_bar(monkeypatch, tmp_path):
     assert "ALERT" not in subject         # winning day, no alerts
 
 
+def test_digest_includes_silent_markets(monkeypatch, tmp_path):
+    cli = _cli_with_data(monkeypatch, tmp_path)
+    (tmp_path / "de").mkdir()
+    (tmp_path / "de" / "ledger.jsonl").write_text(json.dumps({
+        "target": "2026-08-27", "strategy": loop.STRATEGY,
+        "pnl_eur": 301.40, "oracle_pnl_eur": 301.40, "capture": 1.0}) + "\n")
+    subject, body = cli.build_digest()
+    assert "[DE silent]" in body and "+301.40" in body
+    # IT absent (no ledger) -> no IT section
+    assert "[IT silent]" not in body
+
+
 def test_digest_flags_losing_day(monkeypatch, tmp_path):
     cli = _cli_with_data(monkeypatch, tmp_path)
     rows = [json.loads(l) for l in (tmp_path / "ledger.jsonl").read_text().splitlines()]

@@ -48,3 +48,21 @@ def test_ercot_parse_dam_csv_other_hub_and_range():
     # out-of-range delivery day -> empty
     assert fetch_ercot.parse_dam_csv(text, "HB_NORTH", date(2026, 1, 1),
                                      date(2026, 1, 2)) == {}
+
+
+def test_entsoe_parse_a44_aggregates_quarter_hours_and_fills_gaps():
+    from esios_paper import fetch_entsoe
+    xml = (FIX / "entsoe_a44.xml").read_text()
+    out = fetch_entsoe.parse_a44(xml, date(2026, 8, 24), date(2026, 8, 24))
+    # period start 22:00Z = 00:00 Rome (CEST +2); 8 quarter-hours = 2 local hours
+    # hour 00: pos1=100, pos2=200, pos3 MISSING->200 (A03 fill-forward), pos4=400
+    assert out["2026-08-24T00"] == 225.0     # (100+200+200+400)/4
+    # hour 01: 10,20,30,40
+    assert out["2026-08-24T01"] == 25.0
+    assert set(out) == {"2026-08-24T00", "2026-08-24T01"}
+
+
+def test_entsoe_parse_a44_range_filter():
+    from esios_paper import fetch_entsoe
+    xml = (FIX / "entsoe_a44.xml").read_text()
+    assert fetch_entsoe.parse_a44(xml, date(2030, 1, 1), date(2030, 1, 2)) == {}

@@ -112,6 +112,22 @@ def build_digest() -> tuple[str, str] | None:
     subject = (("ALERT — " if alerts else "") +
                f"esios digest {latest} · "
                f"{(prime or {}).get('pnl_eur', 0):+.0f} € · {wins}/{len(prim)}")
+    # Silent shadow markets (DE/IT) — private, this email only (never published).
+    for slug in ("de", "it"):
+        mrows = _load_jsonl(DATA_DIR / slug / "ledger.jsonl")
+        if not mrows:
+            continue
+        mp = [e for e in mrows if e["strategy"] == STRATEGY]
+        if not mp:
+            continue
+        last_t = max(e["target"] for e in mp)
+        le = next(e for e in mp if e["target"] == last_t)
+        mcaps = [e["capture"] for e in mp if e.get("capture") is not None]
+        lines.append("")
+        lines.append(
+            f"[{slug.upper()} silent] {len(mp)} days | total {sum(e['pnl_eur'] for e in mp):+.2f} | "
+            f"mean capture {statistics.fmean(mcaps) * 100:.1f}% | "
+            f"latest {last_t}: {le['pnl_eur']:+.2f} (cap {le.get('capture')})")
     lines.append("")
     lines.append("Paper money, upper bound (exchange fees only). "
                  "Full ledger: arturoquintana.github.io/spain-dayahead-ledger")

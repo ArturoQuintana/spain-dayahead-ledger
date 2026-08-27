@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><title>esios-paper · ledger</title>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><title>Spain day-ahead ledger</title>
 <style>
   :root { color-scheme: light;
     --bg:#f9f9f7; --card:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e;
@@ -83,7 +83,7 @@
     <p class="eyebrow">esios-paper · paper-trading ledger</p>
     <h1>Spanish day-ahead battery arbitrage</h1>
     <p class="asof">1 MW / 2 MWh virtual battery · decisions committed before price publication
-      (leak-guarded, OpenTimestamps-anchored) · data as of <code>2026-08-27 12:30 Madrid</code> ·
+      (leak-guarded, OpenTimestamps-anchored) · data as of <code>2026-08-27 15:54 Madrid</code> ·
       generated from the audit files, no hand-edited numbers</p>
   </header>
 
@@ -97,9 +97,7 @@
     <div class="tile"><div class="k">Record</div>
       <div class="v">26 / 26</div>
       <div class="s">winning settled days · 2 missed</div></div>
-    <div class="tile"><div class="k">GBM v2 gate</div>
-      <div class="v">21 / 21</div>
-      <div class="s">settled days · evaluate ~21 Aug</div></div>
+    <div class="tile"><div class="k">GBM v2 gate</div><div class="v">21 / 21</div><div class="s">settled days · evaluate ~21 Aug</div></div>
   </div>
 
   <h2>Settled days · primary strategy</h2>
@@ -110,53 +108,46 @@
   <div class="open-card" style="margin-bottom:10px"><span class="pending">Pending</span><span class="oc"><b>2026-08-28</b> · Persistence v1 · primary</span><span class="oc">buy <b class="m">15·16h</b> · sell <b class="m">21·22h</b></span><span class="oc">committed <span class="m">2026-08-27T09:00Z</span>, before publication</span></div>
 <div class="open-card" style="margin-bottom:10px"><span class="pending">Pending</span><span class="oc"><b>2026-08-28</b> · Climatology v1 · shadow</span><span class="oc">buy <b class="m">12·13h</b> · sell <b class="m">21·22h</b></span><span class="oc">committed <span class="m">2026-08-27T09:00Z</span>, before publication</span></div>
 <div class="open-card" style="margin-bottom:10px"><span class="pending">Pending</span><span class="oc"><b>2026-08-28</b> · Rank-blend v1 · shadow</span><span class="oc">buy <b class="m">13·15h</b> · sell <b class="m">21·22h</b></span><span class="oc">committed <span class="m">2026-08-27T09:00Z</span>, before publication</span></div>
-<div class="open-card" style="margin-bottom:10px"><span class="pending">Pending</span><span class="oc"><b>2026-08-28</b> · battery-2h2h-weekly · shadow</span><span class="oc">buy <b class="m">13·14h</b> · sell <b class="m">00·21h</b></span><span class="oc">committed <span class="m">2026-08-27T09:00Z</span>, before publication</span></div>
+<div class="open-card" style="margin-bottom:10px"><span class="pending">Pending</span><span class="oc"><b>2026-08-28</b> · Weekly v1 · shadow</span><span class="oc">buy <b class="m">13·14h</b> · sell <b class="m">00·21h</b></span><span class="oc">committed <span class="m">2026-08-27T09:00Z</span>, before publication</span></div>
 
   <h2>Strategy panel · identical settled days</h2>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Target day</th><th>Persistence v1 · primary</th><th>Climatology v1 · shadow</th><th>Rank-blend v1 · shadow</th></tr></thead>
-    <tbody><tr><td class="k">2026-07-31</td><td>+128.34&thinsp;€ (84.5%)</td><td>—</td><td>—</td></tr>
-<tr><td class="k">2026-08-01</td><td>+293.33&thinsp;€ (90.1%)</td><td>—</td><td>—</td></tr>
-<tr><td class="k">2026-08-02</td><td>+341.49&thinsp;€ (99.9%)</td><td>—</td><td>—</td></tr>
-<tr><td class="k">2026-08-03</td><td>+170.42&thinsp;€ (92.0%)</td><td>+181.66&thinsp;€ (98.1%)</td><td>—</td></tr>
-<tr><td class="k">2026-08-04</td><td>+175.27&thinsp;€ (93.4%)</td><td>+182.86&thinsp;€ (97.5%)</td><td>—</td></tr>
-<tr><td class="k">2026-08-05</td><td>missed</td><td>+306.07&thinsp;€ (98.6%)</td><td>—</td></tr>
-<tr><td class="k">2026-08-06</td><td>+326.83&thinsp;€ (99.6%)</td><td>+328.01&thinsp;€ (100.0%)</td><td>—</td></tr>
-<tr><td class="k">2026-08-07</td><td>missed</td><td>+312.63&thinsp;€ (98.9%)</td><td>—</td></tr>
-<tr><td class="k">2026-08-08</td><td>+319.01&thinsp;€ (100.0%)</td><td>+319.01&thinsp;€ (100.0%)</td><td>—</td></tr>
-<tr><td class="k">2026-08-09</td><td>+296.72&thinsp;€ (100.0%)</td><td>+296.69&thinsp;€ (100.0%)</td><td>—</td></tr>
-<tr><td class="k">2026-08-10</td><td>+294.30&thinsp;€ (96.6% · tau 0.802)</td><td>+304.57&thinsp;€ (100.0% · tau 0.877)</td><td>—</td></tr>
-<tr><td class="k">2026-08-11</td><td>+300.93&thinsp;€ (92.9% · tau 0.841)</td><td>+300.93&thinsp;€ (92.9% · tau 0.884)</td><td>—</td></tr>
-<tr><td class="k">2026-08-12</td><td>+315.84&thinsp;€ (92.2% · tau 0.819)</td><td>+299.11&thinsp;€ (87.3% · tau 0.768)</td><td>+315.84&thinsp;€ (92.2% · tau 0.812)</td></tr>
-<tr><td class="k">2026-08-13</td><td>+322.13&thinsp;€ (98.9% · tau 0.899)</td><td>+315.79&thinsp;€ (96.9% · tau 0.855)</td><td>+325.78&thinsp;€ (100.0% · tau 0.938)</td></tr>
-<tr><td class="k">2026-08-14</td><td>+287.61&thinsp;€ (98.6% · tau 0.870)</td><td>+257.84&thinsp;€ (88.4% · tau 0.862)</td><td>+287.61&thinsp;€ (98.6% · tau 0.878)</td></tr>
-<tr><td class="k">2026-08-15</td><td>+326.83&thinsp;€ (97.2% · tau 0.848)</td><td>+336.17&thinsp;€ (100.0% · tau 0.877)</td><td>+336.17&thinsp;€ (100.0% · tau 0.878)</td></tr>
-<tr><td class="k">2026-08-16</td><td>+353.51&thinsp;€ (100.0% · tau 0.853)</td><td>+353.51&thinsp;€ (100.0% · tau 0.809)</td><td>+353.51&thinsp;€ (100.0% · tau 0.861)</td></tr>
-<tr><td class="k">2026-08-17</td><td>+278.93&thinsp;€ (99.3% · tau 0.722)</td><td>+278.93&thinsp;€ (99.3% · tau 0.790)</td><td>+278.93&thinsp;€ (99.3% · tau 0.752)</td></tr>
-<tr><td class="k">2026-08-18</td><td>+377.67&thinsp;€ (97.2% · tau 0.870)</td><td>+388.63&thinsp;€ (100.0% · tau 0.877)</td><td>+388.63&thinsp;€ (100.0% · tau 0.912)</td></tr>
-<tr><td class="k">2026-08-19</td><td>+341.29&thinsp;€ (97.3% · tau 0.831)</td><td>+341.29&thinsp;€ (97.3% · tau 0.846)</td><td>+341.29&thinsp;€ (97.3% · tau 0.847)</td></tr>
-<tr><td class="k">2026-08-20</td><td>+206.80&thinsp;€ (90.1% · tau 0.838)</td><td>+223.76&thinsp;€ (97.5% · tau 0.855)</td><td>+219.41&thinsp;€ (95.6% · tau 0.879)</td></tr>
-<tr><td class="k">2026-08-21</td><td>+330.07&thinsp;€ (100.0% · tau 0.842)</td><td>+322.34&thinsp;€ (97.6% · tau 0.834)</td><td>+322.34&thinsp;€ (97.6% · tau 0.862)</td></tr>
-<tr><td class="k">2026-08-22</td><td>+288.62&thinsp;€ (99.7% · tau 0.876)</td><td>+286.00&thinsp;€ (98.8% · tau 0.856)</td><td>+288.50&thinsp;€ (99.7% · tau 0.877)</td></tr>
-<tr><td class="k">2026-08-23</td><td>+276.20&thinsp;€ (98.8% · tau 0.776)</td><td>+279.23&thinsp;€ (99.9% · tau 0.766)</td><td>+267.16&thinsp;€ (95.5% · tau 0.777)</td></tr>
-<tr><td class="k">2026-08-24</td><td>+276.10&thinsp;€ (90.0% · tau 0.664)</td><td>+305.41&thinsp;€ (99.5% · tau 0.833)</td><td>+305.41&thinsp;€ (99.5% · tau 0.757)</td></tr>
-<tr><td class="k">2026-08-25</td><td>+352.82&thinsp;€ (98.3% · tau 0.833)</td><td>+351.70&thinsp;€ (98.0% · tau 0.804)</td><td>+354.15&thinsp;€ (98.7% · tau 0.867)</td></tr>
-<tr><td class="k">2026-08-26</td><td>+307.87&thinsp;€ (88.1% · tau 0.638)</td><td>+299.04&thinsp;€ (85.6% · tau 0.681)</td><td>+299.42&thinsp;€ (85.7% · tau 0.686)</td></tr>
-<tr><td class="k">2026-08-27</td><td>+294.25&thinsp;€ (96.1% · tau 0.849)</td><td>+302.61&thinsp;€ (98.8% · tau 0.732)</td><td>+299.79&thinsp;€ (97.9% · tau 0.846)</td></tr></tbody>
+    <thead><tr><th>Target day</th><th>Persistence v1 · primary</th><th>Climatology v1 · shadow</th><th>Rank-blend v1 · shadow</th><th>Weekly v1 · shadow</th></tr></thead>
+    <tbody><tr><td class="k">2026-07-31</td><td>+128.34&thinsp;€ (84.5%)</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-01</td><td>+293.33&thinsp;€ (90.1%)</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-02</td><td>+341.49&thinsp;€ (99.9%)</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-03</td><td>+170.42&thinsp;€ (92.0%)</td><td>+181.66&thinsp;€ (98.1%)</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-04</td><td>+175.27&thinsp;€ (93.4%)</td><td>+182.86&thinsp;€ (97.5%)</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-05</td><td>missed</td><td>+306.07&thinsp;€ (98.6%)</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-06</td><td>+326.83&thinsp;€ (99.6%)</td><td>+328.01&thinsp;€ (100.0%)</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-07</td><td>missed</td><td>+312.63&thinsp;€ (98.9%)</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-08</td><td>+319.01&thinsp;€ (100.0%)</td><td>+319.01&thinsp;€ (100.0%)</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-09</td><td>+296.72&thinsp;€ (100.0%)</td><td>+296.69&thinsp;€ (100.0%)</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-10</td><td>+294.30&thinsp;€ (96.6% · tau 0.802)</td><td>+304.57&thinsp;€ (100.0% · tau 0.877)</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-11</td><td>+300.93&thinsp;€ (92.9% · tau 0.841)</td><td>+300.93&thinsp;€ (92.9% · tau 0.884)</td><td>—</td><td>—</td></tr>
+<tr><td class="k">2026-08-12</td><td>+315.84&thinsp;€ (92.2% · tau 0.819)</td><td>+299.11&thinsp;€ (87.3% · tau 0.768)</td><td>+315.84&thinsp;€ (92.2% · tau 0.812)</td><td>—</td></tr>
+<tr><td class="k">2026-08-13</td><td>+322.13&thinsp;€ (98.9% · tau 0.899)</td><td>+315.79&thinsp;€ (96.9% · tau 0.855)</td><td>+325.78&thinsp;€ (100.0% · tau 0.938)</td><td>—</td></tr>
+<tr><td class="k">2026-08-14</td><td>+287.61&thinsp;€ (98.6% · tau 0.870)</td><td>+257.84&thinsp;€ (88.4% · tau 0.862)</td><td>+287.61&thinsp;€ (98.6% · tau 0.878)</td><td>—</td></tr>
+<tr><td class="k">2026-08-15</td><td>+326.83&thinsp;€ (97.2% · tau 0.848)</td><td>+336.17&thinsp;€ (100.0% · tau 0.877)</td><td>+336.17&thinsp;€ (100.0% · tau 0.878)</td><td>—</td></tr>
+<tr><td class="k">2026-08-16</td><td>+353.51&thinsp;€ (100.0% · tau 0.853)</td><td>+353.51&thinsp;€ (100.0% · tau 0.809)</td><td>+353.51&thinsp;€ (100.0% · tau 0.861)</td><td>—</td></tr>
+<tr><td class="k">2026-08-17</td><td>+278.93&thinsp;€ (99.3% · tau 0.722)</td><td>+278.93&thinsp;€ (99.3% · tau 0.790)</td><td>+278.93&thinsp;€ (99.3% · tau 0.752)</td><td>—</td></tr>
+<tr><td class="k">2026-08-18</td><td>+377.67&thinsp;€ (97.2% · tau 0.870)</td><td>+388.63&thinsp;€ (100.0% · tau 0.877)</td><td>+388.63&thinsp;€ (100.0% · tau 0.912)</td><td>—</td></tr>
+<tr><td class="k">2026-08-19</td><td>+341.29&thinsp;€ (97.3% · tau 0.831)</td><td>+341.29&thinsp;€ (97.3% · tau 0.846)</td><td>+341.29&thinsp;€ (97.3% · tau 0.847)</td><td>—</td></tr>
+<tr><td class="k">2026-08-20</td><td>+206.80&thinsp;€ (90.1% · tau 0.838)</td><td>+223.76&thinsp;€ (97.5% · tau 0.855)</td><td>+219.41&thinsp;€ (95.6% · tau 0.879)</td><td>—</td></tr>
+<tr><td class="k">2026-08-21</td><td>+330.07&thinsp;€ (100.0% · tau 0.842)</td><td>+322.34&thinsp;€ (97.6% · tau 0.834)</td><td>+322.34&thinsp;€ (97.6% · tau 0.862)</td><td>—</td></tr>
+<tr><td class="k">2026-08-22</td><td>+288.62&thinsp;€ (99.7% · tau 0.876)</td><td>+286.00&thinsp;€ (98.8% · tau 0.856)</td><td>+288.50&thinsp;€ (99.7% · tau 0.877)</td><td>—</td></tr>
+<tr><td class="k">2026-08-23</td><td>+276.20&thinsp;€ (98.8% · tau 0.776)</td><td>+279.23&thinsp;€ (99.9% · tau 0.766)</td><td>+267.16&thinsp;€ (95.5% · tau 0.777)</td><td>+279.23&thinsp;€ (99.9% · tau 0.749)</td></tr>
+<tr><td class="k">2026-08-24</td><td>+276.10&thinsp;€ (90.0% · tau 0.664)</td><td>+305.41&thinsp;€ (99.5% · tau 0.833)</td><td>+305.41&thinsp;€ (99.5% · tau 0.757)</td><td>+301.21&thinsp;€ (98.2% · tau 0.783)</td></tr>
+<tr><td class="k">2026-08-25</td><td>+352.82&thinsp;€ (98.3% · tau 0.833)</td><td>+351.70&thinsp;€ (98.0% · tau 0.804)</td><td>+354.15&thinsp;€ (98.7% · tau 0.867)</td><td>+351.70&thinsp;€ (98.0% · tau 0.804)</td></tr>
+<tr><td class="k">2026-08-26</td><td>+307.87&thinsp;€ (88.1% · tau 0.638)</td><td>+299.04&thinsp;€ (85.6% · tau 0.681)</td><td>+299.42&thinsp;€ (85.7% · tau 0.686)</td><td>+307.49&thinsp;€ (88.0% · tau 0.755)</td></tr>
+<tr><td class="k">2026-08-27</td><td>+294.25&thinsp;€ (96.1% · tau 0.849)</td><td>+302.61&thinsp;€ (98.8% · tau 0.732)</td><td>+299.79&thinsp;€ (97.9% · tau 0.846)</td><td>+297.40&thinsp;€ (97.1% · tau 0.826)</td></tr></tbody>
   </table></div>
-  <p class="note">Climatology v1 vs Persistence v1: +35.07&thinsp;€ over 23 shared days · Rank-blend v1 vs Persistence v1: +47.40&thinsp;€ over 16 shared days. Claims of superiority require the
+  <p class="note">Climatology v1 vs Persistence v1: +35.07&thinsp;€ over 23 shared days · Rank-blend v1 vs Persistence v1: +47.40&thinsp;€ over 16 shared days · Weekly v1 vs Persistence v1: +29.79&thinsp;€ over 5 shared days. Claims of superiority require the
     pre-registered bar (&ge;30 non-tied shared days, sign-test p&lt;0.05) —
-    see VERIFY.md. All 3 strategies settle on identical days
+    see VERIFY.md. All 4 strategies settle on identical days
     with identical costs; none can be revised after the fact.</p>
 
-  <h2>Escalation gate</h2>
-  <div class="gate">
-    <div class="gl"><span>Progress to the GBM&nbsp;v2 evaluation</span>
-      <span class="m">21 of 21 settled days</span></div>
-    <div class="gate-cells"><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i></div>
-    <div class="gl"><span>Evaluation criteria frozen in advance; stop
-      conditions pre-registered</span><span class="m">~21 Aug 2026</span></div>
-  </div>
+  <h2>Escalation gate</h2><div class="gate"><div class="gl"><span>Progress to the GBM&nbsp;v2 evaluation</span><span class="m">21 of 21 settled days</span></div><div class="gate-cells"><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i></div><div class="gl"><span>Evaluation criteria frozen in advance; stop conditions pre-registered</span><span class="m">~21 Aug 2026</span></div></div>
 
   <h2>Ledger · append-only · primary</h2>
   <div class="tbl-wrap"><table>

@@ -8,7 +8,7 @@ strategy panel, P&L math, and guards in loop.py are market-agnostic.
 """
 from __future__ import annotations
 
-from . import fetch_ercot, fetch_smard
+from . import fetch_entsoe, fetch_ercot, fetch_smard
 from .fetch import fetch_hourly as fetch_es
 from .loop import DATA_DIR, LEDGER, PRICES, RECEIPTS, MARKET_TZ, Market
 
@@ -26,6 +26,13 @@ ERCOT = Market.make("ercot", "America/Chicago",
                     fetch_ercot.make_fetch("HB_NORTH"),
                     deadline_hour=10, currency="USD")
 
-# Registry by slug. IT (derived-metrics-only) is added when its fetcher +
-# mirror-redaction land.
-MARKETS = {m.slug: m for m in (ES, DE, ERCOT)}
+# Italy (IT-SUD): ENTSO-E day-ahead zonal prices, DERIVED-METRICS-ONLY —
+# prices are fetched privately and NEVER republished (the public mirror
+# redacts `it` prices; only metrics are ever published). SDAC-coupled, gate
+# closes 12:00 CET. Currently PRIVATE/silent like DE (excluded from the
+# mirror entirely); the derived-only redaction is built when IT goes public.
+IT = Market.make("it", "Europe/Rome", fetch_entsoe.fetch_hourly,
+                 deadline_hour=12, currency="EUR")
+
+# Registry by slug.
+MARKETS = {m.slug: m for m in (ES, DE, ERCOT, IT)}

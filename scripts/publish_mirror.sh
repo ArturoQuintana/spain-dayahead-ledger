@@ -38,3 +38,25 @@ if [ -n "$(git status --porcelain)" ]; then
 else
   echo "[mirror] up to date"
 fi
+
+# --- Germany public mirror (DE data IS redistributable: SMARD CC BY 4.0) ---
+# DE is git-attested (not yet OTS-anchored); disclosed in its VERIFY.
+cd "$(dirname "$0")/.."
+DEMIR="${DE_MIRROR_DIR:-$HOME/de-mirror}"
+if [ -d "$DEMIR/.git" ] && [ -d Data/de ]; then
+  uv run python scripts/render_dashboard.py --market de "$DEMIR/index.html"
+  mkdir -p "$DEMIR/Data" "$DEMIR/docs"
+  rsync -a --delete --exclude __pycache__ Data/de/ "$DEMIR/Data/"
+  rsync -a --delete --exclude __pycache__ src/ "$DEMIR/src/"
+  rsync -a --delete --exclude __pycache__ tests/ "$DEMIR/tests/"
+  cp GOVERNANCE.md pyproject.toml uv.lock "$DEMIR/"
+  cp README-de.md "$DEMIR/README.md"
+  cp VERIFY-de.md "$DEMIR/VERIFY.md"
+  cd "$DEMIR"
+  if [ -n "$(git status --porcelain)" ]; then
+    git add -A && git commit -q -m "DE ledger update $(date -u +%FT%TZ)"
+    git push -q && echo "[de-mirror] published" || echo "[de-mirror] PUSH-FAILED"
+  else
+    echo "[de-mirror] up to date"
+  fi
+fi
