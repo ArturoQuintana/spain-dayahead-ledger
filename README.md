@@ -1,9 +1,9 @@
-# A committed-before-truth ledger for Spanish day-ahead power
+# A committed-before-truth ledger for Iberian (MIBEL) day-ahead power
 
 **Live dashboard:** see `index.html` (GitHub Pages) · **Audit it yourself:** [VERIFY.md](VERIFY.md)
 
 This repository is the public, auditable record of a paper-trading
-experiment on Spanish day-ahead electricity prices (OMIE/ESIOS). Every day,
+experiment on Spanish day-ahead electricity prices (OMIE/ESIOS). The market is Iberian: OMIE/MIBEL couples Spain and Portugal, and the Spanish (ES) and Portuguese (PT) zone prices are identical except on the infrequent congestion-split days. This ledger is priced on the ES zone (apidatos.ree.es); it therefore represents the Iberian market but does not separately track PT-zone prices — stated plainly rather than overclaimed. Every day,
 BEFORE the ~13:15 CET auction publication, a set of pre-registered
 strategies commits receipts simulating a 1 MW / 2 MWh battery (buy the 2
 cheapest hours, sell the 2 dearest; 85% round-trip efficiency; explicit

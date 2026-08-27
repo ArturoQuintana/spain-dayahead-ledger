@@ -131,7 +131,7 @@ def build_digest() -> tuple[str, str] | None:
             f"latest {last_t}: {le['pnl_eur']:+.2f} (cap {le.get('capture')})")
     lines.append("")
     lines.append("Paper money, upper bound (exchange fees only).")
-    lines.append("Dashboards: Spain arturoquintana.github.io/spain-dayahead-ledger"
+    lines.append("Dashboards: Iberia arturoquintana.github.io/spain-dayahead-ledger"
                  " · Germany arturoquintana.github.io/germany-dayahead-ledger")
     return subject, "\n".join(lines)
 

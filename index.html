@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><title>Spain day-ahead ledger</title>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><title>Iberia day-ahead ledger</title>
 <style>
   :root { color-scheme: light;
     --bg:#f9f9f7; --card:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e;
@@ -81,9 +81,9 @@
 <div class="wrap">
   <header>
     <p class="eyebrow">esios-paper · paper-trading ledger</p>
-    <h1>Spanish day-ahead battery arbitrage</h1>
+    <h1>Iberian (MIBEL) day-ahead battery arbitrage</h1>
     <p class="asof">1 MW / 2 MWh virtual battery · decisions committed before price publication
-      (leak-guarded, OpenTimestamps-anchored) · data as of <code>2026-08-27 16:03 Madrid</code> ·
+      (leak-guarded, OpenTimestamps-anchored) · data as of <code>2026-08-27 16:09 Madrid</code> ·
       generated from the audit files, no hand-edited numbers</p>
   </header>
 
@@ -192,7 +192,7 @@
       Kendall tau-b of the committed forecast vs the actual day.</p>
     <p>Paper money — no capital at stake. Every receipt is committed and
       pushed before the D+1 auction publishes (~13:15 CET); the ledger is
-      append-only and OpenTimestamps-anchored; prices: apidatos.ree.es,
+      append-only and OpenTimestamps-anchored; prices: apidatos.ree.es (Spanish/ES zone; under MIBEL, Portuguese/PT prices match except on rare congestion splits),
       cross-checked weekly against the independent token ESIOS route.
       Absolute EUR is an <b>upper bound</b> (exchange fees only — no grid
       charges, taxes, or aggregator margin); relative metrics are robust.
