@@ -103,6 +103,23 @@ def test_pt_entsoe_a44_aggregates_quarter_hours(monkeypatch):
     assert "documentType=A44" in calls[0] and "securityToken=test-token" in calls[0]
 
 
+def test_fr_entsoe_targets_the_france_zone(monkeypatch):
+    """FR must query the FRANCE bidding zone, not accidentally IT/PT — the classic
+    copy-paste-the-wrong-EIC bug that would silently onboard a mislabeled market.
+    Guards markets/fr/'s EIC + Europe/Paris wiring against the shared A44 client."""
+    monkeypatch.setenv("ENTSOE_TOKEN", "test-token")
+    from esios_paper.markets.fr import FR, PARIS
+    assert FR == "10YFR-RTE------C" and str(PARIS) == "Europe/Paris"
+    xml = (FIX / "entsoe_a44_pt_2026-08-20.xml").read_bytes()   # A44 parse is zone-agnostic
+    calls = []
+    fetch_fr = fetch_entsoe.make_fetch(FR, PARIS,
+                                       _open=router({"web-api.tp.entsoe.eu": xml}, calls))
+    out = fetch_fr(date(2026, 8, 20), date(2026, 8, 20))
+    assert f"in_Domain={FR}" in calls[0] and f"out_Domain={FR}" in calls[0]
+    assert "documentType=A44" in calls[0]
+    assert len(out) >= 20, "FR fetch parsed no Paris-local hours"
+
+
 # ---- ERCOT (MIS listing -> zip -> CSV) ---------------------------------------
 
 def _ercot_zip() -> bytes:

@@ -16,31 +16,38 @@ VERIFY.md.
 
 The loop is market-agnostic (a frozen `Market` dataclass parameterizes zone,
 timezone, commit deadline, currency, Data/<slug>/ tree, and fetch client — the
-strategy panel, P&L math, and guards are shared). Five markets run today:
+strategy panel, P&L math, and guards are shared). Six markets run today:
 
     market  zone      source / license               cur  deadline  writer        public tier
     ES      Spain     apidatos.ree.es · public        EUR  13:00     server        Pages + Bitcoin-OTS
     DE      DE-LU     SMARD.de · CC BY 4.0            EUR  12:00     server        Pages + OTS
     IT      IT-SUD    ENTSO-E A44 · token, derived    EUR  12:00     server        private (license)
     PT      PT        ENTSO-E A44 · token, derived    EUR  12:00     server        private (license)
+    FR      France    ENTSO-E A44 · token, derived    EUR  12:00     server        private (license)
     ERCOT   HB_NORTH  ERCOT MIS NP4-190 · public/redist USD 10:00    GitHub Actions private + OTS
 
-Two writers, not one: the server writes ES/DE/IT/PT; ERCOT is driven from
+Two writers, not one: the server writes ES/DE/IT/PT/FR; ERCOT is driven from
 GitHub Actions US runners (ERCOT DAM geo-blocks EU IPs). Both push directly to
 `main`; the `main-protection` ruleset blocks force-push and branch deletion so
-the append-only trail cannot be rewritten. IT/PT are private because ENTSO-E
+the append-only trail cannot be rewritten. IT/PT/FR are private because ENTSO-E
 day-ahead is not freely redistributable (derived-metrics-only if ever
 published); ERCOT is redistributable and could go public later. Historical
 cross-market capture is in docs/backtest-markets-2026-08.md.
 
-`markets.py` is the SINGLE SOURCE OF TRUTH (Phase 0 of the market-plugin
-refactor, 2026-08-27): each `Market` carries flags (`primary`/`public`/`driver`/
-`redistributable` + `presentation`), and every operational surface — the email
-digest, `server_tick.sh` (via `python -m esios_paper markets --driver server`),
-`render_dashboard.py`, this table — QUERIES the registry instead of hardcoding a
-slug subset. Drift is caught by `test_market_registry.py` + `test_docs_in_sync`
-(this table must match the registry's flags). Per-market VERTICAL modules
-(`markets/<slug>/`) are later phases; see docs/market-plugin-refactor-plan.md.
+The `markets/` package is the SINGLE SOURCE OF TRUTH (Phase 0, 2026-08-27; became
+a package in Phase 1, 2026-08-28): `markets/__init__.py` holds the registry and
+each `Market` carries flags (`primary`/`public`/`driver`/`redistributable` +
+`presentation`), and every operational surface — the email digest, `server_tick.sh`
+(via `python -m esios_paper markets --driver server`), `render_dashboard.py`, this
+table — QUERIES the registry instead of hardcoding a slug subset. The market
+CONTRACT (the `Fetcher` protocol + the re-exported `Market`/`Presentation` types,
+which stay defined in the `loop.py` core) lives in `markets/base.py`. Drift is
+caught by `test_market_registry.py` + `test_market_conformance.py` (every market
+has its guards) + `test_docs_in_sync` (this table must match the registry's flags).
+Per-market VERTICAL modules (`markets/<slug>/`) are Phase 2, IN PROGRESS: FR and
+DE are vertical modules today (`markets/fr/`, `markets/de/` — the latter owns the
+SMARD client at `markets/de/fetch.py`; `esios_paper.fetch_smard` is a compat
+shim); ES/IT/PT/ERCOT migrate next, ES last. See docs/market-plugin-refactor-plan.md.
 
 ## Components
 
