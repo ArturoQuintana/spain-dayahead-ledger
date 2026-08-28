@@ -31,8 +31,10 @@ receipt is worthless.
 from __future__ import annotations
 
 import json
+import os
 import statistics
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from math import isfinite
@@ -83,12 +85,30 @@ FETCH_RETRY_DELAYS_S = (300, 900)
 
 
 @dataclass(frozen=True)
+class Presentation:
+    """How a market renders on a public dashboard (owned by the market, READ by
+    scripts/render_dashboard.py). Left as defaults for markets with no public
+    page — the market-first single source of truth for presentation, replacing
+    the hardcoded dict that used to live in render_dashboard (Phase 0)."""
+    title: str = ""
+    tab_name: str = ""
+    tz_label: str = ""
+    source: str = ""
+    show_gate: bool = False
+
+
+@dataclass(frozen=True)
 class Market:
     """A day-ahead market the loop can run. Spain (ES) is the default and uses
     the repo-root Data/ tree; additional markets get Data/<slug>/, their own
     timezone, commit deadline, currency, and fetch client. The strategy panel,
     P&L math, leak/clock guards, and telemetry are all market-agnostic — only
-    these parameters change (multi-market build, 2026-08-22)."""
+    these parameters change (multi-market build, 2026-08-22).
+
+    The flags below are the SINGLE SOURCE OF TRUTH for what used to be five
+    hardcoded slug lists (digest, server_tick, render_dashboard, publish_mirror,
+    the ARCHITECTURE table): operational surfaces query the registry and branch
+    on these flags instead of hardcoding subsets (Phase 0, 2026-08-27)."""
     slug: str
     tz: ZoneInfo
     deadline_hour: int
@@ -102,17 +122,25 @@ class Market:
     # get () = fail fast: they run before ES in server_tick.sh, so a stalled
     # silent fetch would delay the primary tick past its deadline.
     fetch_retries: tuple[int, ...] = ()
+    primary: bool = False           # drives the heartbeat / the full ES pass
+    public: bool = False            # has a public mirror + dashboard
+    driver: str = "server"          # "server" (esios-tick) | "actions" (geo-block)
+    redistributable: bool = False   # raw prices may be republished
+    presentation: Presentation = field(default_factory=Presentation)
 
     @classmethod
     def make(cls, slug: str, tz: str | ZoneInfo, fetch: Callable, *,
              deadline_hour: int = COMMIT_DEADLINE_HOUR, currency: str = "EUR",
-             root: Path | None = None,
-             fetch_retries: tuple[int, ...] = ()) -> "Market":
+             root: Path | None = None, fetch_retries: tuple[int, ...] = (),
+             primary: bool = False, public: bool = False, driver: str = "server",
+             redistributable: bool = False,
+             presentation: Presentation | None = None) -> "Market":
         d = (root or DATA_DIR) / slug
         return cls(slug, ZoneInfo(tz) if isinstance(tz, str) else tz,
                    deadline_hour, currency, d / "prices.json",
                    d / "receipts.jsonl", d / "ledger.jsonl", fetch,
-                   fetch_retries)
+                   fetch_retries, primary, public, driver, redistributable,
+                   presentation or Presentation())
 
 
 def _default_market() -> Market:
@@ -133,22 +161,91 @@ def load_prices(path: Path | None = None) -> dict[str, float]:
 
 
 def save_prices(prices: dict[str, float], path: Path | None = None) -> None:
+    """Rewrite the dataset of record atomically: write a temp file, fsync it,
+    then os.replace (atomic on POSIX). A crash never leaves a half-written
+    prices.json — the leak guard reads this file, so a torn one is dangerous."""
     path = path or PRICES
     path.parent.mkdir(parents=True, exist_ok=True)
     rows = [{"ts": k, "price": v} for k, v in sorted(prices.items())]
-    path.write_text(json.dumps(rows))
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(rows))
+    with tmp.open("rb") as fh:
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+
+def _repair_torn_tail(path: Path) -> None:
+    """Before appending, remove an interrupted trailing write (a crash after
+    the last record's newline but before this one's) so every WHOLE line in the
+    append-only file is a committed record. Only the final line can be torn
+    (O_APPEND writes don't interleave); it's a complete record iff the file ends
+    in '\\n'. The partial bytes are QUARANTINED to <name>.corrupt, never dropped
+    silently."""
+    data = path.read_bytes()
+    if not data or data.endswith(b"\n"):
+        return
+    cut = data.rfind(b"\n") + 1            # 0 if the whole file is one torn line
+    torn = data[cut:]
+    with (path.parent / (path.name + ".corrupt")).open("ab") as q:
+        q.write(torn + b"\n")
+    with path.open("rb+") as fh:
+        fh.truncate(cut)
+        fh.flush()
+        os.fsync(fh.fileno())
+    print(f"[esios-paper] quarantined a torn trailing write in {path.name} "
+          f"({len(torn)} B -> {path.name}.corrupt); append-only invariant restored")
 
 
 def _append(path: Path, record: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        _repair_torn_tail(path)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(record) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())             # durable before the tick reports success
 
 
 def _load_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
-    return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+    lines = [l for l in path.read_text().splitlines() if l.strip()]
+    out = []
+    for i, line in enumerate(lines):
+        try:
+            out.append(json.loads(line))
+        except json.JSONDecodeError:
+            if i == len(lines) - 1:
+                break        # torn trailing write (crash before fsync); prefix stands
+            raise            # a broken line MID-file is real corruption, not tolerated
+    return out
+
+
+class WriterLockError(RuntimeError):
+    """A second writer tried to hold the same ledger's lock."""
+
+
+@contextmanager
+def writer_lock(lock_path: Path):
+    """The 'never run two writers' rule as a MECHANISM, not a convention: an
+    exclusive advisory lock, non-blocking, so a second tick on the same ledger
+    raises (WriterLockError) instead of interleaving appends. Unix-only (fcntl);
+    the loop runs on Linux/macOS."""
+    import fcntl
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fh = lock_path.open("w")
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as exc:
+        fh.close()
+        raise WriterLockError(
+            f"another writer holds {lock_path.name}; refusing to run two "
+            "writers on the same ledger") from exc
+    try:
+        yield
+    finally:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        fh.close()
 
 
 # --- pure strategy/accounting primitives (unit-tested) ---
@@ -341,6 +438,13 @@ def tick(*, market: Market | None = None, fetch=None, today: date | None = None,
             save_prices(prices, market.prices_path)
             summary.pop("fetch_error", None)
             break
+        except (TypeError, AttributeError, NameError, ImportError):
+            # A bug in OUR OWN code — never how a network/feed fails. Crash
+            # honestly instead of masquerading as a fetch failure (which would
+            # silently degrade to stale data and hide the bug). Feed-shaped
+            # failures (OSError, bad JSON/XML, KeyError, bad zip, a
+            # validate_prices ValueError) fall through to the handler below.
+            raise
         except Exception as exc:
             # Stale data: settlement just waits; commitment may still be
             # possible (and is still leak-safe: the guard checks OUR dataset,

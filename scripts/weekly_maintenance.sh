@@ -9,22 +9,22 @@ cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$PATH"
 git pull --ff-only || true
 
-PYTHONPATH=tools/esios-fetcher uv run python -m esios_fetcher \
+PYTHONPATH=tools/esios-fetcher uv run --no-dev python -m esios_fetcher \
   || echo "[weekly] token-route refresh FAILED"
 
-if ! uv run python scripts/crosscheck_routes.py; then
+if ! uv run --no-dev python scripts/crosscheck_routes.py; then
   echo "$(date -u +%FT%TZ) cross-check failed or inconclusive" \
     >> Data/CROSSCHECK-ALERTS.log
 fi
 
-if ! uv run python scripts/audit_ots_manifests.py; then
+if ! uv run --no-dev python scripts/audit_ots_manifests.py; then
   echo "$(date -u +%FT%TZ) unstamped ots manifest(s) found" \
     >> Data/OTS-GAPS.log
 fi
 
 for f in Data/ots/*.txt.ots Data/de/ots/*.txt.ots; do
   [ -e "$f" ] || continue
-  uvx --from opentimestamps-client ots upgrade "$f" || true
+  uvx --from opentimestamps-client==0.7.2 ots upgrade "$f" || true   # pinned (see __main__.OTS_CLIENT)
 done
 rm -f Data/ots/*.bak
 

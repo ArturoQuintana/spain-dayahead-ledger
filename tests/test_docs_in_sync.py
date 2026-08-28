@@ -38,3 +38,24 @@ def test_every_strategy_is_documented():
         f"strategies in code but not in docs/ARCHITECTURE.md panel: {missing_arch}")
     assert not missing_claude, (
         f"strategies in code but not in CLAUDE.md registered panel: {missing_claude}")
+
+
+def _architecture_market_rows():
+    """The rows of the ARCHITECTURE.md Markets table, keyed by slug."""
+    body = ARCHITECTURE.split("## Markets", 1)[1].split("\n## ", 1)[0]
+    slugs = {s.upper() for s in MARKETS}
+    return {mm.group(1).lower(): line for line in body.splitlines()
+            if (mm := re.match(r"\s+([A-Z]{2,6})\b", line)) and mm.group(1) in slugs}
+
+
+def test_architecture_table_lists_exactly_the_registered_markets():
+    assert set(_architecture_market_rows()) == set(MARKETS)
+
+
+def test_architecture_table_flags_match_the_registry():
+    rows = _architecture_market_rows()
+    for slug, m in MARKETS.items():
+        line = rows[slug]
+        assert ("private" in line) != m.public, f"{slug} public flag drift: {line}"
+        assert ("Actions" in line) == (m.driver == "actions"), \
+            f"{slug} driver flag drift: {line}"

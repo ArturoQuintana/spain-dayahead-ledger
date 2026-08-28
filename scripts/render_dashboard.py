@@ -23,20 +23,27 @@ NAMES = {"battery-2h2h-persistence": "Persistence v1",
          "battery-2h2h-weekly": "Weekly v1"}
 GATE_DAYS = 21
 
-# Per-market presentation. ES is the default and keeps the public page
-# byte-identical; other markets override the labels and drop the ES-only gate.
-MARKETS = {
-    "es": {"data": DATA, "title": "Spanish day-ahead battery arbitrage",
-           "tzlabel": "Madrid", "gate": True,
-           "source": "apidatos.ree.es,\n      cross-checked weekly against "
-                     "the independent token ESIOS route"},
-    "de": {"data": DATA / "de", "title": "German (DE-LU) day-ahead battery arbitrage",
-           "tzlabel": "Berlin", "gate": False,
-           "source": "Bundesnetzagentur | SMARD.de (CC BY 4.0)"},
-    "it": {"data": DATA / "it", "title": "Italian (IT-SUD) day-ahead battery arbitrage",
-           "tzlabel": "Rome", "gate": False,
-           "source": "ENTSO-E (private use; prices not redistributed)"},
-}
+# Per-market presentation is DERIVED from the market registry (the single source
+# of truth) — not a hardcoded dict (Phase 0, 2026-08-27). Every renderable market
+# appears automatically; ES presentation strings live on the ES market and are
+# byte-for-byte what this dict used to hold, so the public page is unchanged.
+sys.path.insert(0, str(ROOT / "src"))
+from esios_paper.markets import MARKETS as _REGISTRY   # noqa: E402
+
+
+def _presentation_config() -> dict[str, dict]:
+    out = {}
+    for slug, m in _REGISTRY.items():
+        p = m.presentation
+        if not p.title:
+            continue
+        out[slug] = {"data": m.prices_path.parent, "title": p.title,
+                     "tzlabel": p.tz_label, "gate": p.show_gate,
+                     "source": p.source, "tab": p.tab_name}
+    return out
+
+
+MARKETS = _presentation_config()
 
 
 def jsonl(p: Path) -> list[dict]:
@@ -205,8 +212,7 @@ def build(slug: str = "es") -> str:
         gate_section = ""
 
     return TEMPLATE % {
-        "tabtitle": {"es": "Spain", "de": "Germany", "it": "Italy"}[slug]
-                    + " day-ahead ledger",
+        "tabtitle": cfg["tab"] + " day-ahead ledger",
         "title": cfg["title"],
         "source": cfg.get("source", "apidatos.ree.es"),
         "asof": now.strftime(f"%Y-%m-%d %H:%M {cfg['tzlabel']}"),

@@ -33,6 +33,15 @@ day-ahead is not freely redistributable (derived-metrics-only if ever
 published); ERCOT is redistributable and could go public later. Historical
 cross-market capture is in docs/backtest-markets-2026-08.md.
 
+`markets.py` is the SINGLE SOURCE OF TRUTH (Phase 0 of the market-plugin
+refactor, 2026-08-27): each `Market` carries flags (`primary`/`public`/`driver`/
+`redistributable` + `presentation`), and every operational surface — the email
+digest, `server_tick.sh` (via `python -m esios_paper markets --driver server`),
+`render_dashboard.py`, this table — QUERIES the registry instead of hardcoding a
+slug subset. Drift is caught by `test_market_registry.py` + `test_docs_in_sync`
+(this table must match the registry's flags). Per-market VERTICAL modules
+(`markets/<slug>/`) are later phases; see docs/market-plugin-refactor-plan.md.
+
 ## Components
 
     ┌──────────────── Hetzner VPS (primary writer; ERCOT via GitHub Actions) ────────┐

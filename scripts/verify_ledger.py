@@ -30,6 +30,7 @@ DATA = Path(__file__).resolve().parents[1] / "Data"
 PNL_TOL = 0.005      # ledger pnl/oracle are rounded to 2 dp
 CAP_TOL = 0.0005     # capture rounded to 3 dp
 MIN_DAY_HOURS = 23   # a fully-published day (23 on the DST-spring day)
+OTS_CLIENT = "opentimestamps-client==0.7.2"   # pinned (see __main__.OTS_CLIENT)
 
 
 # --- the P&L math, reimplemented independently (mirrors the doc, not the code) ---
@@ -223,7 +224,7 @@ def verify_market(slug: str, verify_ots: bool) -> Report:
             proof = m.with_suffix(".txt.ots")
             try:
                 out = subprocess.run(
-                    ["uvx", "--from", "opentimestamps-client", "ots", "verify",
+                    ["uvx", "--from", OTS_CLIENT, "ots", "verify",
                      str(proof)], capture_output=True, text=True, timeout=120)
                 blob = (out.stderr + out.stdout).lower()
                 if "success" in blob or "bitcoin block" in blob:

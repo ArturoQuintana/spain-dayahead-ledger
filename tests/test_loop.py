@@ -255,6 +255,19 @@ def test_fetch_failure_keeps_loop_alive_and_leak_safe():
     assert s["committed"] == []
 
 
+def test_our_code_bug_crashes_not_swallowed_as_fetch_failure():
+    # A programming error in the fetch path (TypeError/AttributeError/...) must
+    # propagate and crash the tick — never be logged as a fetch_error and
+    # silently degrade to stale data, which would hide the bug.
+    d1 = _flat_day("2026-08-01", 60)
+    tick(fetch=lambda a, b: d1, today=date(2026, 8, 1))
+
+    def buggy(a, b):
+        raise TypeError("'NoneType' object is not subscriptable")   # our bug
+    with pytest.raises(TypeError):
+        tick(fetch=buggy, today=date(2026, 8, 2), sleep=lambda _s: None)
+
+
 def test_validate_prices_rails():
     ok = {"2026-08-01T03": -5.0, "2026-08-01T04": 3999.9}
     assert loop.validate_prices(ok) is None
@@ -460,8 +473,32 @@ def test_digest_builds_settlement_race_and_bar(monkeypatch, tmp_path):
     subject, body = cli.build_digest()
     assert "esios digest 2026-08-13" in subject and "+322" in subject
     assert "+322.13" in body and "tau 0.899" in body
-    assert "bar not met" in body          # 1 shared day never meets the bar
+    # the digest is DESCRIPTIVE — it defers the verdict to the Option C bar and
+    # never auto-declares "BAR MET" (referee-gated, superseded-method guard)
+    assert "verdict via the Option C bar" in body and "BAR MET" not in body
     assert "ALERT" not in subject         # winning day, no alerts
+
+
+def test_digest_never_auto_declares_bar_met(monkeypatch, tmp_path):
+    # 30 days where climatology beats persistence — the OLD digest method would
+    # have printed "BAR MET". The digest must NOT auto-declare it (a bar-met
+    # claim is the referee-gated Option C verdict, not the digest's to make).
+    import esios_paper.__main__ as cli
+    monkeypatch.setattr(cli, "LEDGER", tmp_path / "ledger.jsonl")
+    monkeypatch.setattr(cli, "RECEIPTS", tmp_path / "receipts.jsonl")
+    monkeypatch.setattr(cli, "DATA_DIR", tmp_path)
+    rows = []
+    for i in range(30):
+        d = f"2026-08-{i + 1:02d}"
+        rows += [{"target": d, "strategy": loop.STRATEGY, "pnl_eur": 0.0,
+                  "oracle_pnl_eur": 100.0, "capture": 0.0},
+                 {"target": d, "strategy": "battery-2h2h-climatology",
+                  "pnl_eur": 10.0, "oracle_pnl_eur": 100.0, "capture": 0.1}]
+    (tmp_path / "ledger.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n")
+    _, body = cli.build_digest()
+    assert "BAR MET" not in body
+    assert "verdict via the Option C bar" in body
 
 
 def test_digest_includes_silent_markets(monkeypatch, tmp_path):

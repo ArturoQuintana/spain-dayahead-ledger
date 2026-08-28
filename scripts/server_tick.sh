@@ -11,15 +11,16 @@ git pull --ff-only || echo "[esios-paper] pre-tick pull failed (continuing on lo
 # for these — they accumulate privately (not mirrored) until the auditor is
 # extended per-market. The 11:00 Madrid slot = 11:00 Berlin (<12:00 DE gate)
 # = 04:00 CT (<10:00 ERCOT deadline): pre-publication for both.
-# ERCOT temporarily removed 2026-08-23: ercot.com returns HTTP 403 to the
-# Helsinki server (US-geo/datacenter block on the whole domain — DE/SMARD is
-# fine). Left in the loop it also stalls every tick ~20min via fetch retries.
-# Re-add once an EU-reachable ERCOT source lands (incident 2026-08-23).
-for m in de it pt; do
-  uv run python -m esios_paper tick --market "$m" \
+# The server-driven shadow set comes from the REGISTRY (markets with
+# driver="server", non-primary) — not a hardcoded list (Phase 0). ERCOT is
+# driver="actions" (ercot.com 403s this Helsinki server — geo-block, incident
+# 2026-08-23), so it's excluded here and runs on GitHub Actions instead; adding
+# or moving a market never touches this script.
+for m in $(uv run --no-dev python -m esios_paper markets --driver server); do
+  uv run --no-dev python -m esios_paper tick --market "$m" \
     || echo "[esios-paper] $m tick failed (non-fatal, silent market)"
 done
-uv run python -m esios_paper tick          # ES: commits Data/ (all markets)
+uv run --no-dev python -m esios_paper tick          # ES: commits Data/ (all markets)
 rc=$?
 scripts/publish_mirror.sh || echo "[esios-paper] mirror publish failed (non-fatal)"
 exit $rc

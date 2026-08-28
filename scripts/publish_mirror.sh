@@ -11,7 +11,7 @@ export PATH="$HOME/.local/bin:$PATH"
 MIRROR="${MIRROR_DIR:-$HOME/ledger-mirror}"
 [ -d "$MIRROR/.git" ] || { echo "[mirror] $MIRROR not initialized; skipping"; exit 0; }
 
-uv run python scripts/render_dashboard.py "$MIRROR/index.html"
+uv run --no-dev python scripts/render_dashboard.py "$MIRROR/index.html"
 mkdir -p "$MIRROR/docs"
 # ES data only. Silent shadow markets (de/ercot/it) accumulate PRIVATELY and
 # must NOT reach the public mirror until the auditor is extended per-market
@@ -50,7 +50,7 @@ fi
 cd "$REPO"
 DEMIR="${DE_MIRROR_DIR:-$HOME/de-mirror}"
 if [ -d "$DEMIR/.git" ] && [ -d Data/de ]; then
-  uv run python scripts/render_dashboard.py --market de "$DEMIR/index.html"
+  uv run --no-dev python scripts/render_dashboard.py --market de "$DEMIR/index.html"
   mkdir -p "$DEMIR/Data" "$DEMIR/docs"
   rsync -a --delete --exclude __pycache__ Data/de/ "$DEMIR/Data/"
   rsync -a --delete --exclude __pycache__ src/ "$DEMIR/src/"

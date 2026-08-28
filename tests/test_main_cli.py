@@ -235,3 +235,21 @@ def test_ots_stamp_slot_overflow(monkeypatch, tmp_path, capsys):
     cli.ots_stamp("L", ots_dir=ots, receipts=rec, ledger=led,
                   _run=lambda *a, **k: called.append(1))
     assert "slot overflow" in capsys.readouterr().out and not called
+
+
+def test_markets_command_by_driver(monkeypatch, capsys):
+    monkeypatch.setattr(cli.sys, "argv", ["esios-paper", "markets", "--driver", "server"])
+    assert cli.main() == 0
+    assert capsys.readouterr().out.strip() == "de it pt"
+
+
+def test_markets_command_public(monkeypatch, capsys):
+    monkeypatch.setattr(cli.sys, "argv", ["esios-paper", "markets", "--public"])
+    assert cli.main() == 0
+    assert capsys.readouterr().out.strip() == "es de"
+
+
+def test_markets_command_all(monkeypatch, capsys):
+    monkeypatch.setattr(cli.sys, "argv", ["esios-paper", "markets"])
+    assert cli.main() == 0
+    assert capsys.readouterr().out.strip() == "es de it pt ercot"

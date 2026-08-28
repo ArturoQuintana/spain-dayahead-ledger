@@ -5,7 +5,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [dependency-groups]
-dev = ["pytest>=8", "pytest-cov>=5"]
+dev = ["pytest>=8", "pytest-cov>=5", "hypothesis>=6"]
 
 # Coverage gate lives in CI (see .github/workflows/ci.yml). The floor is a
 # RATCHET: raised as surfaces gain tests, never lowered. It covers the core
@@ -20,6 +20,7 @@ omit = [
     "scripts/backtest_baselines.py",
     "scripts/backtest_markets.py",
     "scripts/probe_signal.py",
+    "scripts/calibrate_sign_bar.py",   # one-time, numpy/statsmodels/arch (not stdlib)
 ]
 
 [tool.coverage.report]

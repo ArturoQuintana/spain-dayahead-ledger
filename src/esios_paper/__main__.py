@@ -13,10 +13,16 @@ from email.message import EmailMessage
 from math import comb
 from pathlib import Path
 
-from .loop import DATA_DIR, LEDGER, RECEIPTS, STRATEGY, _load_jsonl, tick
+from .loop import (DATA_DIR, LEDGER, RECEIPTS, STRATEGY, WriterLockError,
+                   _load_jsonl, tick, writer_lock)
 
 REPO = Path(__file__).resolve().parents[2]
 OTS_DIR = DATA_DIR / "ots"
+# Pinned: the attestation path must not silently pull a new OTS client build
+# (supply-chain surface on the one thing that makes the ledger tamper-evident).
+# Bump deliberately after testing `ots` locally. Mirrored in verify_ledger.py
+# and scripts/weekly_maintenance.sh.
+OTS_CLIENT = "opentimestamps-client==0.7.2"
 
 
 def _env(key: str) -> str | None:
@@ -84,14 +90,19 @@ def build_digest() -> tuple[str, str] | None:
     for shadow in sorted({e["strategy"] for e in ledger} - {STRATEGY}):
         deltas = [v[shadow] - v[STRATEGY] for v in by_day.values()
                   if shadow in v and STRATEGY in v]
-        w = sum(1 for d in deltas if d > 0.01)
-        l = sum(1 for d in deltas if d < -0.01)
+        # DESCRIPTIVE ONLY. Ties per rule A (round-to-cents). The p here is the
+        # raw iid indicator; it is NOT the operative bar. The bar-met VERDICT is
+        # the pre-registered Option C bar (p_eff=max(p_iid,p_boot) + Holm), which
+        # is referee-gated and computed by `compare_strategies.py --panel` — the
+        # digest never auto-declares it (docs/multiple-comparisons-policy.md).
+        w = sum(1 for d in deltas if round(d, 2) >= 0.01)
+        l = sum(1 for d in deltas if round(d, 2) <= -0.01)
         n = w + l
         p = _sign_p(w, n) if n else 1.0
         lines.append(
             f"{shadow} vs primary: {sum(deltas):+.2f} EUR over {len(deltas)} "
-            f"shared ({w}W-{len(deltas) - w - l}T-{l}L, sign p={p:.3f}"
-            f"{', bar not met' if not (n >= 30 and p < 0.05) else ', BAR MET'})")
+            f"shared ({w}W-{len(deltas) - w - l}T-{l}L, iid p={p:.3f}) — "
+            f"verdict via the Option C bar (compare_strategies --panel)")
 
     prime = today.get(STRATEGY)
     if prime is not None and prime.get("tb2_spread") is not None:
@@ -112,9 +123,12 @@ def build_digest() -> tuple[str, str] | None:
     subject = (("ALERT — " if alerts else "") +
                f"esios digest {latest} · "
                f"{(prime or {}).get('pnl_eur', 0):+.0f} € · {wins}/{len(prim)}")
-    # Silent shadow markets (DE/IT) — private, this email only (never published).
-    for slug in ("de", "it", "pt", "ercot"):
-        mrows = _load_jsonl(DATA_DIR / slug / "ledger.jsonl")
+    # Shadow markets — this private email only (never published). The set and
+    # each market's public/silent label come from the registry, not a hardcoded
+    # list (Phase 0). DATA_DIR is kept as the read seam so tests can monkeypatch.
+    from .markets import shadows
+    for mk in shadows():
+        mrows = _load_jsonl(DATA_DIR / mk.slug / "ledger.jsonl")
         if not mrows:
             continue
         mp = [e for e in mrows if e["strategy"] == STRATEGY]
@@ -123,7 +137,7 @@ def build_digest() -> tuple[str, str] | None:
         last_t = max(e["target"] for e in mp)
         le = next(e for e in mp if e["target"] == last_t)
         mcaps = [e["capture"] for e in mp if e.get("capture") is not None]
-        tag = {"de": "DE public"}.get(slug, f"{slug.upper()} silent")
+        tag = f"{mk.slug.upper()} {'public' if mk.public else 'silent'}"
         lines.append("")
         lines.append(
             f"[{tag}] {len(mp)} days | total {sum(e['pnl_eur'] for e in mp):+.2f} | "
@@ -226,7 +240,7 @@ def ots_stamp(label: str, *, ots_dir: Path | None = None,
                     return
                 continue            # stamped for an older state; next slot
             manifest.write_text(content)
-            r = _run(["uvx", "--from", "opentimestamps-client", "ots",
+            r = _run(["uvx", "--from", OTS_CLIENT, "ots",
                       "stamp", str(manifest)],
                      capture_output=True, text=True, timeout=120)
             if r.returncode == 0 and proof.exists():
@@ -290,22 +304,32 @@ def cmd_tick(market_slug: str | None = None) -> int:
                   f"{', '.join(MARKETS)}")
             return 2
         m = MARKETS[market_slug]
-        s = tick(market=m)
-        _print_summary(s, f"esios-paper:{market_slug}")
-        # OTS-anchor this market's audit trail into its own Data/<slug>/ots
-        # (rides the ES tick's git_backup). No heartbeat/email/push here.
-        ots_stamp(s["date"], ots_dir=m.ledger_path.parent / "ots",
-                  receipts=m.receipts_path, ledger=m.ledger_path)
+        try:
+            with writer_lock(m.ledger_path.parent / ".tick.lock"):
+                s = tick(market=m)
+                _print_summary(s, f"esios-paper:{market_slug}")
+                # OTS-anchor this market's audit trail into its own Data/<slug>/
+                # ots (rides the ES tick's git_backup). No heartbeat/email/push.
+                ots_stamp(s["date"], ots_dir=m.ledger_path.parent / "ots",
+                          receipts=m.receipts_path, ledger=m.ledger_path)
+        except WriterLockError as exc:
+            print(f"[esios-paper:{market_slug}] {exc}")
+            return 3
         print(f"[esios-paper:{market_slug}] tick done "
               f"{json.dumps({k: v if isinstance(v, (str, bool)) else bool(v) for k, v in s.items()})}")
         return 0
 
-    s = tick()
-    _print_summary(s, "esios-paper")
-    ots_stamp(s["date"])
-    git_backup(s["date"])
-    heartbeat(s["primary_receipt_stands"])
-    email_digest(s)
+    try:
+        with writer_lock(DATA_DIR / ".tick.lock"):
+            s = tick()
+            _print_summary(s, "esios-paper")
+            ots_stamp(s["date"])
+            git_backup(s["date"])
+            heartbeat(s["primary_receipt_stands"])
+            email_digest(s)
+    except WriterLockError as exc:
+        print(f"[esios-paper] {exc}")
+        return 3
     print(f"[esios-paper] tick done {json.dumps({k: v if isinstance(v, (str, bool)) else bool(v) for k, v in s.items()})}")
     return 0
 
@@ -340,6 +364,21 @@ def cmd_status() -> int:
     return 0
 
 
+def cmd_markets() -> int:
+    """Emit market slugs (space-separated) for shell consumers so no script
+    hardcodes the set: `markets` = all; `--driver server|actions`; `--public`."""
+    from .markets import MARKETS, by_driver, public_markets
+    args = sys.argv[1:]
+    if "--driver" in args:
+        sel = by_driver(args[args.index("--driver") + 1])
+    elif "--public" in args:
+        sel = public_markets()
+    else:
+        sel = list(MARKETS.values())
+    print(" ".join(m.slug for m in sel))
+    return 0
+
+
 def main() -> int:
     args = sys.argv[1:]
     cmd = args[0] if args else "tick"
@@ -351,7 +390,10 @@ def main() -> int:
         return cmd_tick(market)
     if cmd == "status":
         return cmd_status()
-    print(f"unknown command {cmd!r}; use: tick [--market <slug>] | status")
+    if cmd == "markets":
+        return cmd_markets()
+    print(f"unknown command {cmd!r}; use: tick [--market <slug>] | status | "
+          "markets [--driver <d>|--public]")
     return 2
 
 
