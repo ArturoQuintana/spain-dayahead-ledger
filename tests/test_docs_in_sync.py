@@ -59,3 +59,21 @@ def test_architecture_table_flags_match_the_registry():
         assert ("private" in line) != m.public, f"{slug} public flag drift: {line}"
         assert ("Actions" in line) == (m.driver == "actions"), \
             f"{slug} driver flag drift: {line}"
+
+
+def test_es_mirror_excludes_are_registry_derived():
+    """Incident 2026-08-28: FR (private, derived-only) leaked to the PUBLIC ES
+    mirror because publish_mirror.sh's exclude list was HARDCODED (de/ercot/it/pt)
+    and never updated when FR was added. Detector: the ES-data rsync must derive
+    its excludes from the registry (so a new market can never leak), and must NOT
+    hardcode a per-market --exclude for any registered non-es market."""
+    txt = (ROOT / "scripts" / "publish_mirror.sh").read_text()
+    assert "esios_paper markets" in txt, \
+        "ES mirror excludes must be DERIVED from the registry, not hardcoded"
+    for slug in MARKETS:
+        if slug == "es":
+            continue
+        assert f"--exclude '{slug}/'" not in txt and f"--exclude={slug}/" not in txt, \
+            (f"publish_mirror.sh hardcodes an --exclude for {slug!r}; that list "
+             f"drifts when a market is added (see the FR leak). Derive it from the "
+             f"markets CLI instead.")
