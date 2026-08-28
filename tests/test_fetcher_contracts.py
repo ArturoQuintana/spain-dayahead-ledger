@@ -16,7 +16,10 @@ from pathlib import Path
 
 import pytest
 
-from esios_paper import fetch, fetch_ercot, fetch_entsoe, fetch_smard
+from esios_paper.markets import _entsoe as fetch_entsoe
+from esios_paper.markets.de import fetch as fetch_smard
+from esios_paper.markets.ercot import fetch as fetch_ercot
+from esios_paper.markets.es import fetch
 
 FIX = Path(__file__).resolve().parent / "fixtures"
 

@@ -155,7 +155,7 @@ def _default_market() -> Market:
     lives at markets/es/fetch.py, and markets/ imports loop — a module-level
     import would be a cycle. This keeps the core free of a module-time dependency
     on any market's fetcher (Stage A of the ES migration, 2026-08-28)."""
-    from .fetch import fetch_hourly
+    from .markets.es.fetch import fetch_hourly
     return Market("es", MARKET_TZ, COMMIT_DEADLINE_HOUR, "EUR",
                   PRICES, RECEIPTS, LEDGER, fetch_hourly, FETCH_RETRY_DELAYS_S)
 

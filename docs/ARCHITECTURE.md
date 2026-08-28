@@ -88,13 +88,15 @@ library. See docs/market-plugin-refactor-plan.md.
 
 ## Package layout
 
-    src/esios_paper/
-      fetch.py     route-A client: quarter-hour API → hourly means,
-                   {"YYYY-MM-DDTHH": price}, Europe/Madrid frame. Owns nothing.
-      loop.py      THE CORE. Pure functions + the tick orchestrator. Owns the
-                   strategies, leak guard, settlement math, telemetry.
-      __main__.py  effectful shell: CLI, git backup, OTS stamping, heartbeat,
+    src/esios_paper/     (map: src/esios_paper/README.md)
+      loop.py      THE FUNCTIONAL CORE. Tick orchestrator, leak/clock guards,
+                   settlement + P&L math, storage, telemetry. Market-agnostic.
+      __main__.py  THE IMPERATIVE SHELL. CLI, git backup, OTS stamping, heartbeat,
                    email digest. Injection seams (_smtp, _urlopen, _run) for tests.
+      markets/     THE MARKET PLUGINS. __init__ = the registry (single source of
+                   truth); base.py = the contract; _entsoe.py = shared A44 library;
+                   es/de/ercot own a fetch.py (dedicated client), it/pt/fr bind
+                   _entsoe inline. (Compat shims deleted in Phase 4, 2026-08-28.)
     tools/esios-fetcher/   route-B client (token, PriceDay contract, own tests)
     scripts/               server_tick, weekly_maintenance, publish_mirror,
                            render_dashboard, backtest, compare, crosscheck

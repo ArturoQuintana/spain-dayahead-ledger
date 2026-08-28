@@ -13,18 +13,20 @@ MIRROR="${MIRROR_DIR:-$HOME/ledger-mirror}"
 
 uv run --no-dev python scripts/render_dashboard.py "$MIRROR/index.html"
 mkdir -p "$MIRROR/docs"
-# The ES mirror is ES-ONLY (ES now lives in Data/es/, Stage B). Exclude every
-# OTHER market subdir, DERIVED FROM THE REGISTRY — not a hardcoded list, so a newly
-# added market can NEVER leak into the public mirror. (Incident 2026-08-28: FR
-# leaked because the old hardcoded list — de/ercot/it/pt — was not updated when FR
-# was added.) --delete-excluded purges any such dir already in the mirror; also
-# drop transient .tick.lock files. Only es/ + shared artifacts (esios_prices.json,
-# calibration/, README-MOVED.md) reach the public ES mirror.
-ES_EXCLUDES="--exclude=.tick.lock"
-for s in $(uv run --no-dev python -m esios_paper markets); do
-  [ "$s" = "es" ] || ES_EXCLUDES="$ES_EXCLUDES --exclude=$s/"
-done
-rsync -a --delete --delete-excluded --exclude __pycache__ $ES_EXCLUDES \
+# POSITIVE ALLOWLIST — deny-by-default. The ES mirror publishes ONLY the paths
+# named below; the terminal --exclude='*' drops everything else, so a new market
+# subdir or a stray root file CANNOT leak because it is not on the list — a leak
+# now requires consciously ADDING it, not forgetting to exclude it. (Incident
+# 2026-08-28: FR leaked through a deny-list gap — de/ercot/it/pt was not updated
+# when FR was added. This flips the posture: fail safe.) The ES mirror is ES-only;
+# DE has its own mirror below. --delete-excluded purges anything now disallowed.
+rsync -a --delete --delete-excluded \
+  --exclude='__pycache__' --exclude='.tick.lock' \
+  --include='/es/***' \
+  --include='/esios_prices.json' \
+  --include='/calibration/***' \
+  --include='/README-MOVED.md' \
+  --exclude='*' \
   Data/ "$MIRROR/Data/"
 rsync -a --delete --exclude __pycache__ src/ "$MIRROR/src/"
 rsync -a --delete --exclude __pycache__ tests/ "$MIRROR/tests/"

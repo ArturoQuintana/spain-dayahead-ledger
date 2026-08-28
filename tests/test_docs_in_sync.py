@@ -61,19 +61,20 @@ def test_architecture_table_flags_match_the_registry():
             f"{slug} driver flag drift: {line}"
 
 
-def test_es_mirror_excludes_are_registry_derived():
+def test_es_mirror_is_deny_by_default_allowlist():
     """Incident 2026-08-28: FR (private, derived-only) leaked to the PUBLIC ES
-    mirror because publish_mirror.sh's exclude list was HARDCODED (de/ercot/it/pt)
-    and never updated when FR was added. Detector: the ES-data rsync must derive
-    its excludes from the registry (so a new market can never leak), and must NOT
-    hardcode a per-market --exclude for any registered non-es market."""
+    mirror through a DENY-LIST gap — fr/ was never added to the excludes. The
+    ES-data publish must instead be a POSITIVE ALLOWLIST (deny-by-default): a
+    terminal --exclude='*' so anything not explicitly named cannot leak, and NO
+    non-es market may be explicitly included. A new market or a stray root file is
+    then excluded because it is not on the list — leaking requires consciously
+    adding it, not forgetting to exclude it."""
     txt = (ROOT / "scripts" / "publish_mirror.sh").read_text()
-    assert "esios_paper markets" in txt, \
-        "ES mirror excludes must be DERIVED from the registry, not hardcoded"
+    assert "--exclude='*'" in txt, \
+        "ES-mirror publish must end in a deny-all --exclude='*' (allowlist posture)"
     for slug in MARKETS:
         if slug == "es":
             continue
-        assert f"--exclude '{slug}/'" not in txt and f"--exclude={slug}/" not in txt, \
-            (f"publish_mirror.sh hardcodes an --exclude for {slug!r}; that list "
-             f"drifts when a market is added (see the FR leak). Derive it from the "
-             f"markets CLI instead.")
+        assert f"--include='/{slug}/" not in txt and f"--include=/{slug}/" not in txt, \
+            (f"{slug!r} is explicitly --include'd in a mirror allowlist; only es "
+             f"belongs on the ES mirror (see the FR leak).")

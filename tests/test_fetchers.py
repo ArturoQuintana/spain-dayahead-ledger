@@ -9,7 +9,8 @@ from datetime import date
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from esios_paper import fetch_ercot, fetch_smard
+from esios_paper.markets.de import fetch as fetch_smard
+from esios_paper.markets.ercot import fetch as fetch_ercot
 
 ROME = ZoneInfo("Europe/Rome")   # sample tz for the library parse_a44 tests
 LISBON = ZoneInfo("Europe/Lisbon")
@@ -55,7 +56,7 @@ def test_ercot_parse_dam_csv_other_hub_and_range():
 
 
 def test_entsoe_parse_a44_aggregates_quarter_hours_and_fills_gaps():
-    from esios_paper import fetch_entsoe
+    from esios_paper.markets import _entsoe as fetch_entsoe
     xml = (FIX / "entsoe_a44.xml").read_text()
     out = fetch_entsoe.parse_a44(xml, ROME, date(2026, 8, 24), date(2026, 8, 24))
     # period start 22:00Z = 00:00 Rome (CEST +2); 8 quarter-hours = 2 local hours
@@ -67,13 +68,13 @@ def test_entsoe_parse_a44_aggregates_quarter_hours_and_fills_gaps():
 
 
 def test_entsoe_parse_a44_range_filter():
-    from esios_paper import fetch_entsoe
+    from esios_paper.markets import _entsoe as fetch_entsoe
     xml = (FIX / "entsoe_a44.xml").read_text()
     assert fetch_entsoe.parse_a44(xml, ROME, date(2030, 1, 1), date(2030, 1, 2)) == {}
 
 
 def test_entsoe_parser_respects_timezone_for_pt_vs_it():
-    from esios_paper import fetch_entsoe
+    from esios_paper.markets import _entsoe as fetch_entsoe
     xml = (FIX / "entsoe_a44.xml").read_text()
     # same UTC data, different zone -> different local-hour keys (PT=Lisbon is
     # one hour behind IT=Rome), proving the tz is actually threaded through.
