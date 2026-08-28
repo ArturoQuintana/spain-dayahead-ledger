@@ -17,7 +17,7 @@ from .loop import (DATA_DIR, LEDGER, RECEIPTS, STRATEGY, WriterLockError,
                    _load_jsonl, tick, writer_lock)
 
 REPO = Path(__file__).resolve().parents[2]
-OTS_DIR = DATA_DIR / "ots"
+OTS_DIR = DATA_DIR / "es" / "ots"      # ES now lives under Data/es/ (Stage B)
 # Pinned: the attestation path must not silently pull a new OTS client build
 # (supply-chain surface on the one thing that makes the ledger tamper-evident).
 # Bump deliberately after testing `ots` locally. Mirrored in verify_ledger.py
@@ -320,7 +320,7 @@ def cmd_tick(market_slug: str | None = None) -> int:
         return 0
 
     try:
-        with writer_lock(DATA_DIR / ".tick.lock"):
+        with writer_lock(DATA_DIR / "es" / ".tick.lock"):
             s = tick()
             _print_summary(s, "esios-paper")
             ots_stamp(s["date"])

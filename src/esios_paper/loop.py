@@ -62,12 +62,15 @@ def market_today(tz: ZoneInfo = MARKET_TZ) -> date:
     date.today() can disagree with the market day by one."""
     return datetime.now(tz).date()
 
-from .fetch import fetch_hourly
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "Data"
-PRICES = DATA_DIR / "prices.json"
-RECEIPTS = DATA_DIR / "receipts.jsonl"
-LEDGER = DATA_DIR / "ledger.jsonl"
+# ES lives at Data/es/ like every other market (Stage B, 2026-08-28) — no market
+# is privileged at the project root. Data/ root holds only shared/project artifacts
+# (esios_prices.json deep history, calibration/) + one subdir per market.
+ES_DIR = DATA_DIR / "es"
+PRICES = ES_DIR / "prices.json"
+RECEIPTS = ES_DIR / "receipts.jsonl"
+LEDGER = ES_DIR / "ledger.jsonl"
 
 STRATEGY = "battery-2h2h-persistence"          # the PRIMARY strategy (heartbeat key)
 STRATEGY_VERSION = "1"
@@ -146,7 +149,13 @@ class Market:
 def _default_market() -> Market:
     """Spain on the repo-root Data/ paths. Reads the module globals LIVE so
     tests that monkeypatch loop.PRICES/RECEIPTS/LEDGER keep working, and so
-    ES behavior is byte-identical to the pre-parameterization loop."""
+    ES behavior is byte-identical to the pre-parameterization loop.
+
+    The ES fetcher is imported LAZILY here (not at module scope): its client now
+    lives at markets/es/fetch.py, and markets/ imports loop — a module-level
+    import would be a cycle. This keeps the core free of a module-time dependency
+    on any market's fetcher (Stage A of the ES migration, 2026-08-28)."""
+    from .fetch import fetch_hourly
     return Market("es", MARKET_TZ, COMMIT_DEADLINE_HOUR, "EUR",
                   PRICES, RECEIPTS, LEDGER, fetch_hourly, FETCH_RETRY_DELAYS_S)
 

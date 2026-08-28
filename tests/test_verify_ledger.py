@@ -53,8 +53,12 @@ def _faithful(base: Path):
 
 @pytest.fixture
 def market(tmp_path, monkeypatch):
+    # ES lives at Data/es/ now (Stage B) — verify_market("es") reads DATA/es, so
+    # seed the es subdir and keep vl.DATA as its parent.
     monkeypatch.setattr(vl, "DATA", tmp_path)
-    return tmp_path
+    es = tmp_path / "es"
+    es.mkdir()
+    return es
 
 
 def test_faithful_ledger_passes(market):
@@ -225,8 +229,8 @@ def test_main_clean_returns_zero(market, monkeypatch, capsys):
 
 
 def test_main_all_discovers_subdir_markets(market, monkeypatch, capsys):
-    _faithful(market)
-    (market / "de").mkdir(); _faithful(market / "de")
+    _faithful(market)                              # market = DATA/es
+    de = market.parent / "de"; de.mkdir(); _faithful(de)   # sibling DATA/de
     monkeypatch.setattr(vl.sys, "argv", ["verify_ledger.py", "--all"])
     assert vl.main() == 0
     out = capsys.readouterr().out

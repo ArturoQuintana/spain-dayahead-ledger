@@ -16,59 +16,32 @@ in later phases.
 """
 from __future__ import annotations
 
-from .. import fetch_entsoe, fetch_ercot
-from ..fetch import fetch_hourly as fetch_es
-from ..loop import DATA_DIR, LEDGER, PRICES, RECEIPTS, MARKET_TZ
 from .base import Fetcher, Market, Presentation  # the contract surface
 
 __all__ = ["MARKETS", "shadows", "public_markets", "by_driver",
            "Market", "Presentation", "Fetcher"]
 
-# Spain: the primary. Repo-root Data/ paths (not Data/es/) for continuity with
-# the existing live ledger; public, Bitcoin-anchored, its receipt drives the
-# heartbeat. Presentation strings are the byte-for-byte source render_dashboard
-# used to hold — the public page must not change.
-ES = Market("es", MARKET_TZ, 13, "EUR", PRICES, RECEIPTS, LEDGER, fetch_es,
-            primary=True, public=True, redistributable=True,
-            presentation=Presentation(
-                title="Spanish day-ahead battery arbitrage",
-                tab_name="Spain", tz_label="Madrid", show_gate=True,
-                source="apidatos.ree.es,\n      cross-checked weekly against "
-                       "the independent token ESIOS route"))
+# Spain: the primary. Migrated to a vertical markets/es/ module in Phase 2
+# (2026-08-28) — the last incumbent, imported like the others. STAGE A keeps ES on
+# the repo-root Data/ paths; the Data/ -> Data/es/ move is Stage B
+# (docs/es-data-migration-plan.md).
+from .es import MARKET as ES  # noqa: E402
 
 # Germany (DE-LU): SMARD.de, CC BY 4.0. Public. Gate 12:00 CET. Migrated to a
 # vertical markets/de/ module in Phase 2 (2026-08-28) — imported, not inline.
 from .de import MARKET as DE  # noqa: E402
 
-# Italy (IT-SUD): ENTSO-E, DERIVED-METRICS-ONLY (prices never republished).
-# Private. SDAC-coupled, gate 12:00 CET.
-IT = Market.make("it", "Europe/Rome", fetch_entsoe.fetch_hourly,
-                 deadline_hour=12, currency="EUR",
-                 presentation=Presentation(
-                     title="Italian (IT-SUD) day-ahead battery arbitrage",
-                     tab_name="Italy", tz_label="Rome",
-                     source="ENTSO-E (private use; prices not redistributed)"))
+# Italy (IT-SUD): independent ENTSO-E market. Migrated to a vertical markets/it/
+# module in Phase 2 (2026-08-28) — owns its EIC/tz, binds _entsoe inline.
+from .it import MARKET as IT  # noqa: E402
 
-# Portugal (PT): the other half of MIBEL — real PT-zone prices (ENTSO-E), NOT
-# an ES relabel. Derived-only/private like Italy. Europe/Lisbon.
-PT = Market.make("pt", "Europe/Lisbon",
-                 fetch_entsoe.make_fetch(fetch_entsoe.PT, fetch_entsoe.LISBON),
-                 deadline_hour=12, currency="EUR",
-                 presentation=Presentation(
-                     title="Portuguese (PT) day-ahead battery arbitrage",
-                     tab_name="Portugal", tz_label="Lisbon",
-                     source="ENTSO-E (private use; prices not redistributed)"))
+# Portugal (PT): independent ENTSO-E market (real PT-zone, not an ES relabel).
+# Migrated to a vertical markets/pt/ module in Phase 2 (2026-08-28).
+from .pt import MARKET as PT  # noqa: E402
 
-# ERCOT (Texas): DAM SPP, hub HB_NORTH, USD. Redistributable (NP4-190 public),
-# but geo-blocks EU IPs -> driven from GitHub Actions US runners, not the server.
-ERCOT = Market.make("ercot", "America/Chicago",
-                    fetch_ercot.make_fetch("HB_NORTH"),
-                    deadline_hour=10, currency="USD", driver="actions",
-                    redistributable=True,
-                    presentation=Presentation(
-                        title="ERCOT (HB_NORTH) day-ahead battery arbitrage",
-                        tab_name="ERCOT", tz_label="Chicago",
-                        source="ERCOT public data (NP4-190, DAM SPP)"))
+# ERCOT (Texas): DAM SPP, HB_NORTH, USD, driver=actions. Migrated to a vertical
+# markets/ercot/ module in Phase 2 (2026-08-28) — imported, not inline.
+from .ercot import MARKET as ERCOT  # noqa: E402
 
 # France (FR): the first market as a VERTICAL markets/<slug>/ module (Phase 1.5,
 # 2026-08-28) — imported, not defined inline. ENTSO-E derived-only/private like

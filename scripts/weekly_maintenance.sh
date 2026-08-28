@@ -22,11 +22,13 @@ if ! uv run --no-dev python scripts/audit_ots_manifests.py; then
     >> Data/OTS-GAPS.log
 fi
 
-for f in Data/ots/*.txt.ots Data/de/ots/*.txt.ots; do
+# Every market's OTS proofs (ES now at Data/es/ots; all markets covered uniformly,
+# fixing the old es+de-only list). Data/<slug>/ots/*.txt.ots.
+for f in Data/*/ots/*.txt.ots; do
   [ -e "$f" ] || continue
   uvx --from opentimestamps-client==0.7.2 ots upgrade "$f" || true   # pinned (see __main__.OTS_CLIENT)
 done
-rm -f Data/ots/*.bak
+rm -f Data/*/ots/*.bak
 
 if [ -n "$(git status --porcelain Data)" ]; then
   git add Data

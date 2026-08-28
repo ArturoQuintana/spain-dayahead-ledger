@@ -26,7 +26,7 @@ from math import comb
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LEDGER = ROOT / "Data" / "ledger.jsonl"
+LEDGER = ROOT / "Data" / "es" / "ledger.jsonl"   # ES ledger (Data/es/ since Stage B)
 CALIBRATION = ROOT / "Data" / "calibration" / "sign_bar.json"
 TIE_EPS = 0.01
 PRIMARY = "battery-2h2h-persistence"

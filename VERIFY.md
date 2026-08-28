@@ -1,8 +1,8 @@
 # How to verify this ledger (for a skeptic)
 
-The claim: every trading decision in `Data/receipts.jsonl` was committed
+The claim: every trading decision in `Data/es/receipts.jsonl` was committed
 BEFORE the prices it would be judged against were published, and every P&L
-figure in `Data/ledger.jsonl` follows mechanically from those receipts and
+figure in `Data/es/ledger.jsonl` follows mechanically from those receipts and
 publicly available prices. You should not have to trust us on any of it.
 
 ## 1. The timing claim (receipts predate the auction)
@@ -12,14 +12,14 @@ CET on T-1. A receipt for target T is honest only if it existed before that.
 
 **Weak check (trusts GitHub):** every tick commits and pushes `Data/`. Compare
 any receipt's `committed_at` (UTC, inside the file) with the push time of the
-commit that introduced it: `git log --follow --format='%H %cI' -- Data/receipts.jsonl`.
+commit that introduced it: `git log --follow --format='%H %cI' -- Data/es/receipts.jsonl`.
 
-**Strong check (trusts no one):** `Data/ots/<date>.txt` holds the SHA-256 of
+**Strong check (trusts no one):** `Data/es/ots/<date>.txt` holds the SHA-256 of
 both audit files at stamp time; `<date>.txt.ots` is an OpenTimestamps proof
 anchoring that manifest in Bitcoin. Verify with the open-source client:
 
-    sha256sum Data/receipts.jsonl        # compare against the manifest text
-    ots verify Data/ots/<date>.txt.ots   # proves the manifest existed at time X
+    sha256sum Data/es/receipts.jsonl        # compare against the manifest text
+    ots verify Data/es/ots/<date>.txt.ots   # proves the manifest existed at time X
 
 (Proofs are stamped daily and upgraded to Bitcoin-anchored weekly; a
 just-created proof may still be "pending" — re-run `ots upgrade` later.)
@@ -45,7 +45,7 @@ displaced final state was preserved (`<date>-2.txt`) but never itself
 submitted to OpenTimestamps, so those 13 dates currently have no Bitcoin
 anchor of their final content, only of an earlier, partial one. This does
 not affect any P&L figure (all settlement arithmetic re-verifies exactly
-against Data/prices.json); it narrows what the "strong check" proves for
+against Data/es/prices.json); it narrows what the "strong check" proves for
 those 13 dates specifically. From 2026-08-22 on, every tick's manifest
 slot is stamped, closing the gap going forward
 (`scripts/audit_ots_manifests.py` now detects any recurrence).

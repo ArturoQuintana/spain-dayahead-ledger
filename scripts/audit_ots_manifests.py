@@ -24,7 +24,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-OTS_DIR = Path(__file__).resolve().parents[1] / "Data" / "ots"
+OTS_DIR = Path(__file__).resolve().parents[1] / "Data" / "es" / "ots"  # ES at Data/es/ (Stage B)
 
 
 def find_unstamped(ots_dir: Path, today: str) -> list[str]:
@@ -41,7 +41,7 @@ def find_unstamped(ots_dir: Path, today: str) -> list[str]:
 
 def main() -> int:
     if not OTS_DIR.exists():
-        print("[ots-audit] Data/ots absent; nothing to check")
+        print("[ots-audit] Data/es/ots absent; nothing to check")
         return 0
     today = datetime.now(timezone.utc).date().isoformat()
     gaps = find_unstamped(OTS_DIR, today)
@@ -51,7 +51,7 @@ def main() -> int:
     print(f"[ots-audit] {len(gaps)} manifest(s) written but never stamped "
           "(no Bitcoin anchor for that file state):")
     for name in gaps:
-        print(f"  Data/ots/{name}")
+        print(f"  Data/es/ots/{name}")
     return 1
 
 

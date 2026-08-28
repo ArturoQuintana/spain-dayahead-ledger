@@ -4,7 +4,7 @@ criteria themselves were frozen 2026-08-21-minus-weeks in CLAUDE.md — this
 plan fixes their COMPUTATION so the evaluator has no residual discretion)
 
 ## Inputs
-All persistence-v1 settled days in Data/ledger.jsonl at evaluation time
+All persistence-v1 settled days in Data/es/ledger.jsonl at evaluation time
 (expected 21). Shadows and the 11.5y backtest are context, not criteria.
 
 ## Primary computations (exact)

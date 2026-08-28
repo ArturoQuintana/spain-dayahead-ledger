@@ -91,9 +91,10 @@ def test_de_smard_selects_overlapping_bucket_only():
 
 def test_pt_entsoe_a44_aggregates_quarter_hours(monkeypatch):
     monkeypatch.setenv("ENTSOE_TOKEN", "test-token")   # _open is mocked anyway
+    from esios_paper.markets.pt import PT, LISBON
     xml = (FIX / "entsoe_a44_pt_2026-08-20.xml").read_bytes()
     calls = []
-    fetch_pt = fetch_entsoe.make_fetch(fetch_entsoe.PT, fetch_entsoe.LISBON,
+    fetch_pt = fetch_entsoe.make_fetch(PT, LISBON,
                                        _open=router({"web-api.tp.entsoe.eu": xml}, calls))
     out = fetch_pt(date(2026, 8, 20), date(2026, 8, 20))
     assert len(out) == 24
@@ -101,6 +102,7 @@ def test_pt_entsoe_a44_aggregates_quarter_hours(monkeypatch):
     assert out["2026-08-20T12"] == 110.11
     assert out["2026-08-20T23"] == 196.59
     assert "documentType=A44" in calls[0] and "securityToken=test-token" in calls[0]
+    assert f"in_Domain={PT}" in calls[0]        # targets the Portugal zone (EIC guard)
 
 
 def test_fr_entsoe_targets_the_france_zone(monkeypatch):

@@ -100,7 +100,7 @@ class Report:
 
 
 def verify_market(slug: str, verify_ots: bool) -> Report:
-    d = DATA if slug == "es" else DATA / slug
+    d = DATA / slug                        # ES is Data/es/ now — no special-case
     r = Report(slug)
     prices = load_prices(d / "prices.json")
     receipts = load_jsonl(d / "receipts.jsonl")
@@ -247,7 +247,9 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.all:
-        slugs = ["es"] + sorted(p.parent.name for p in DATA.glob("*/receipts.jsonl"))
+        # every market is Data/<slug>/ now (ES included) — just glob; the old
+        # ["es"] + … prefix would double-count es after the Stage-B move.
+        slugs = sorted(p.parent.name for p in DATA.glob("*/receipts.jsonl"))
     else:
         slugs = [args.market]
 

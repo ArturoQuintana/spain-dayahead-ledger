@@ -25,7 +25,8 @@ def _seed(monkeypatch, tmp_path, route_a, route_b, argv=("100000",)):
     that day's list shorter than 24 (an incomplete/DST day)."""
     ra = [{"ts": f"{d}T{h:02d}", "price": p}
           for d, hrs in route_a.items() for h, p in sorted(hrs.items())]
-    (tmp_path / "prices.json").write_text(json.dumps(ra))
+    (tmp_path / "es").mkdir(exist_ok=True)     # route A = ES loop dataset (Data/es/)
+    (tmp_path / "es" / "prices.json").write_text(json.dumps(ra))
     rb = [{"date": date.fromisoformat(d).strftime("%d/%m/%Y"),
            "prices": [hrs[h] for h in sorted(hrs)]}
           for d, hrs in route_b.items()]

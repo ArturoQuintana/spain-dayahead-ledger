@@ -44,10 +44,24 @@ CONTRACT (the `Fetcher` protocol + the re-exported `Market`/`Presentation` types
 which stay defined in the `loop.py` core) lives in `markets/base.py`. Drift is
 caught by `test_market_registry.py` + `test_market_conformance.py` (every market
 has its guards) + `test_docs_in_sync` (this table must match the registry's flags).
-Per-market VERTICAL modules (`markets/<slug>/`) are Phase 2, IN PROGRESS: FR and
-DE are vertical modules today (`markets/fr/`, `markets/de/` — the latter owns the
-SMARD client at `markets/de/fetch.py`; `esios_paper.fetch_smard` is a compat
-shim); ES/IT/PT/ERCOT migrate next, ES last. See docs/market-plugin-refactor-plan.md.
+Per-market VERTICAL modules (`markets/<slug>/`): **all six markets are vertical
+modules now** (Phase 2 code refactor complete), and **ES data lives at `Data/es/`
+like every other market** (Stage B, 2026-08-28) — `Data/` root holds only
+shared/project artifacts (`esios_prices.json` deep history, `calibration/`) plus one
+subdir per market; no market is privileged. `loop.py` no longer imports a market's
+fetcher at
+module scope (the ES fetcher is imported lazily inside `_default_market`), so the
+core is free of a module-time market dependency. **A `markets/<slug>/fetch.py`
+exists to house a
+market's DEDICATED fetch LOGIC** — DE owns the SMARD client, ERCOT the MIS pipeline
+(`esios_paper.fetch_smard`/`fetch_ercot` are compat shims). Markets that use the
+SHARED ENTSO-E A44 library (`markets/_entsoe.py`) own no fetch logic, so they have
+no `fetch.py`: their fetch is a one-line EIC/tz binding inline with the Market
+config. **IT, PT, and FR are INDEPENDENT markets** — each owns its EIC + timezone
+and binds the library; `markets/_entsoe.py` holds NO market constants, so a change
+to one cannot touch another (the old `fetch_entsoe.py` shared-module entanglement,
+defect #3, is fixed). `esios_paper.fetch_entsoe` is a compat shim re-exporting the
+library. See docs/market-plugin-refactor-plan.md.
 
 ## Components
 
@@ -112,16 +126,16 @@ shim); ES/IT/PT/ERCOT migrate next, ES last. See docs/market-plugin-refactor-pla
 
 ## Data flow and formats
 
-    apidatos ──fetch──▶ Data/prices.json          [{"ts","price"}] hourly,
+    apidatos ──fetch──▶ Data/es/prices.json          [{"ts","price"}] hourly,
                                                   dataset of record; leak guard
                                                   is defined against THIS file
-    strategies ─commit─▶ Data/receipts.jsonl      append-only; target, hours,
+    strategies ─commit─▶ Data/es/receipts.jsonl      append-only; target, hours,
                                                   basis_day, basis_profile,
                                                   params, committed_at (UTC)
-    publication ─settle─▶ Data/ledger.jsonl       append-only; pnl_eur, oracle,
+    publication ─settle─▶ Data/es/ledger.jsonl       append-only; pnl_eur, oracle,
                                                   capture, tau, neg_hours,
                                                   tb2_spread, settled_at
-    both ──sha256──▶ Data/ots/<date>.txt(.ots)    daily manifest + OTS proof;
+    both ──sha256──▶ Data/es/ots/<date>.txt(.ots)    daily manifest + OTS proof;
                                                   Bitcoin-anchored weekly
     route B (weekly) ─▶ Data/esios_prices.json    independent deep history
                                                   (2015→), cross-checked vs A;

@@ -1,6 +1,6 @@
 """Cross-validate the two independent price routes over the trailing window.
 
-Route A: Data/prices.json (tokenless apidatos.ree.es — the loop's dataset of
+Route A: Data/es/prices.json (tokenless apidatos.ree.es — the loop's dataset of
 record). Route B: Data/esios_prices.json (token api.esios.ree.es, refreshed by
 the weekly maintenance job). Both derive from the same OMIE auction, so any
 disagreement beyond rounding means one feed is broken — the ledger's only
@@ -26,7 +26,7 @@ def main() -> int:
     tol = float(sys.argv[2]) if len(sys.argv) > 2 else 0.51
 
     route_a: dict[str, dict[int, float]] = {}
-    for row in json.loads((DATA / "prices.json").read_text()):
+    for row in json.loads((DATA / "es" / "prices.json").read_text()):
         d, h = row["ts"].split("T")
         route_a.setdefault(d, {})[int(h)] = row["price"]
 

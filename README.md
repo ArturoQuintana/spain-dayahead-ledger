@@ -23,7 +23,7 @@ What makes this record different from a backtest or a vendor claim:
   recorded before T's prices were published — enforced in code (the leak
   guard) and provable from the outside.
 - **Tamper-evident**: daily OpenTimestamps proofs anchor the audit files'
-  hashes in Bitcoin (`Data/ots/`). You do not need to trust us, or GitHub.
+  hashes in Bitcoin (`Data/es/ots/`). You do not need to trust us, or GitHub.
 - **Append-only, losses included**: missed days and losing days stay in the
   record forever. Strategy changes require a new pre-registered strategy id.
 - **Pre-registered stop conditions and comparison tests**: the conditions

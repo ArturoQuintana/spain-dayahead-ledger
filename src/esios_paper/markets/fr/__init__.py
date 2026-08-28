@@ -1,26 +1,29 @@
 """France (FR) — EPEX SPOT day-ahead via ENTSO-E. DERIVED-METRICS-ONLY (prices
-never republished), private — the SAME ENTSO-E source and license basis as IT/PT,
-so no new redistribution terms are needed. SDAC-coupled, gate 12:00 CET,
-Europe/Paris.
+never republished), private — the same ENTSO-E source and license basis as IT/PT.
+SDAC-coupled, gate 12:00 CET, Europe/Paris.
 
-FIRST market built as a vertical `markets/<slug>/` module on the Phase-1 contract
-(2026-08-28): this module owns only France's specifics — its ENTSO-E bidding-zone
-EIC, timezone, and presentation — while the shared A44 client (`fetch_entsoe`)
-stays a library. The incumbents migrate into this shape in Phase 2. FR completes
-EU price-regime coverage (French nuclear/central-west); it is the flagship of the
-SDAC-coupled FR/BE/NL cluster (docs/market-expansion-shortlist-2026-08.md).
+STRUCTURE PRINCIPLE (why there is no `markets/fr/fetch.py`): a `fetch.py` exists to
+house a market's DEDICATED fetch LOGIC — DE owns the SMARD client, ERCOT the MIS
+pipeline. FR owns none: it uses the SHARED ENTSO-E A44 library
+(`markets/_entsoe.py`), so its fetch is a one-line zone/tz BINDING
+(config, not logic) and lives inline with the Market config below. IT and PT are
+INDEPENDENT markets with the same ENTSO-E behavior and bind the shared library the
+same way; the Phase-2 extraction to `markets/_entsoe.py` decouples all three from
+today's shared-module entanglement (plan defect #3) without adding ceremony files.
+FR completes EU price-regime coverage (French central-west) and is the flagship of
+the SDAC FR/BE/NL cluster (docs/market-expansion-shortlist-2026-08.md).
 """
 from __future__ import annotations
 
 from zoneinfo import ZoneInfo
 
-from esios_paper import fetch_entsoe
-from esios_paper.markets.base import Market, Presentation
+from ..base import Market, Presentation
+from .._entsoe import make_fetch          # the shared ENTSO-E A44 library
 
 PARIS = ZoneInfo("Europe/Paris")
 FR = "10YFR-RTE------C"        # ENTSO-E EIC for the France bidding zone (validated 2026-08-28)
 
-MARKET = Market.make("fr", PARIS, fetch_entsoe.make_fetch(FR, PARIS),
+MARKET = Market.make("fr", PARIS, make_fetch(FR, PARIS),
                      deadline_hour=12, currency="EUR",
                      presentation=Presentation(
                          title="French (FR) day-ahead battery arbitrage",
