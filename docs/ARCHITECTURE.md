@@ -10,7 +10,8 @@ is a measurement instrument: the product is a track record that cannot be
 faked, revised, or cherry-picked. Spain is the primary market; the same loop
 now runs eight markets (see "Markets" below). Governance (who may change what,
 and how claims are verified) is in CLAUDE.md; outsider verification in
-VERIFY.md.
+VERIFY.md. The cross-disciplinary domains this project spans (and where each
+lives) are mapped in docs/knowledge-map.md.
 
 ## Markets (updated 2026-08-27)
 
