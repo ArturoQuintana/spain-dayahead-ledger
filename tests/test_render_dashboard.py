@@ -207,6 +207,30 @@ def test_main_site_es_is_index_others_are_siblings(monkeypatch, tmp_path):
     assert "German (DE-LU) day-ahead battery arbitrage" in (out / "de.html").read_text()
 
 
+def test_pages_never_overclaim_bitcoin_finality(monkeypatch, tmp_path):
+    """OTS proofs are PENDING (calendar-only) until a Bitcoin block confirms them
+    (~days later). Every currently-public market except ES's pre-08-22 dates has
+    only pending proofs, so a flat 'OpenTimestamps-anchored' claim overstates the
+    timestamp's finality (red-team finding, 2026-08-29). The pages must say
+    'stamped' and disclose the pending->confirmed distinction, never assert a
+    Bitcoin anchor that does not yet exist. Covers BOTH templates (settled + the
+    awaiting page a fresh market like GB renders)."""
+    # settled ES page
+    _seed(monkeypatch, tmp_path, "es", ["2026-08-12", "2026-08-13"],
+          [_settle("2026-08-13", P, 100.0, 120.0, 0.83)],
+          [_receipt("2026-08-13", "2026-08-12", P)])
+    # awaiting GB page (committed receipt, no settled day, only-pending proof)
+    _seed(monkeypatch, tmp_path, "gb", ["2026-08-13"], [],
+          [_receipt("2026-08-14", "2026-08-13", P)])
+    for slug, must_be_awaiting in (("es", False), ("gb", True)):
+        html = rd.build(slug)
+        assert "OpenTimestamps-anchored" not in html          # the overclaim is gone
+        assert "OpenTimestamps-stamped" in html               # honest verb
+        assert "within days" in html                          # confirmation is future
+        if must_be_awaiting:
+            assert "awaiting first settled day" in html       # right template
+
+
 def test_day_card_skipped_when_basis_curve_missing(monkeypatch, tmp_path):
     # basis day 2026-08-12 has NO price row -> the day card is dropped, but the
     # settlement still appears in the append-only ledger table.

@@ -158,8 +158,8 @@ def _awaiting(slug: str, cfg: dict, receipts: list[dict], now: datetime,
     <p class="eyebrow"><a href="index.html">Talea</a> · {slug.upper()}</p>
     <h1>{cfg['title']}</h1>
     <p class="asof">1&nbsp;MW / 2&nbsp;MWh virtual battery · decisions committed
-      before price publication (leak-guarded, OpenTimestamps-anchored) ·
-      as of <code>{asof}</code></p>
+      before price publication (leak-guarded, OpenTimestamps-stamped —
+      Bitcoin&#8209;confirmed within days) · as of <code>{asof}</code></p>
   </header>
   <div class="banner"><b>Live · awaiting first settled day.</b> The receipts
     below are already committed and pushed <i>before</i> the auction publishes —
@@ -169,8 +169,10 @@ def _awaiting(slug: str, cfg: dict, receipts: list[dict], now: datetime,
   {chr(10).join(open_html)}
   <footer>
     <p>Paper money — no capital at stake. Prices: {src}. The ledger is
-      append-only and OpenTimestamps-anchored; verify everything yourself —
-      see VERIFY.md in this repository.</p>
+      append-only; each day's hash is OpenTimestamps-stamped at commit and
+      Bitcoin-confirmed within days (a just-committed proof is <i>pending</i>
+      until a block lands — see VERIFY.md for per-date status). Verify
+      everything yourself — see VERIFY.md in this repository.</p>
   </footer>
 </div>"""
 
@@ -418,8 +420,8 @@ TEMPLATE = """<title>%(tabtitle)s</title>
     <p class="eyebrow">Talea · paper-trading ledger</p>
     <h1>%(title)s</h1>
     <p class="asof">1 MW / 2 MWh virtual battery · decisions committed before price publication
-      (leak-guarded, OpenTimestamps-anchored) · data as of <code>%(asof)s</code> ·
-      generated from the audit files, no hand-edited numbers</p>
+      (leak-guarded, OpenTimestamps-stamped &mdash; Bitcoin&#8209;confirmed within days) ·
+      data as of <code>%(asof)s</code> · generated from the audit files, no hand-edited numbers</p>
   </header>
 
   <div class="tiles">
@@ -470,7 +472,10 @@ TEMPLATE = """<title>%(tabtitle)s</title>
       Kendall tau-b of the committed forecast vs the actual day.</p>
     <p>Paper money — no capital at stake. Every receipt is committed and
       pushed before the D+1 auction publishes (~13:15 CET); the ledger is
-      append-only and OpenTimestamps-anchored; prices: %(source)s.
+      append-only and OpenTimestamps-stamped — each day's proof is submitted at
+      commit and Bitcoin-confirmed within days (a fresh proof is <i>pending</i>
+      until a block lands; see VERIFY.md for per-date confirmed/pending status);
+      prices: %(source)s.
       Absolute %(curcode)s is an <b>upper bound</b> (exchange fees only — no grid
       charges, taxes, or aggregator margin); relative metrics are robust.
       Verify everything yourself: see VERIFY.md in this repository.</p>

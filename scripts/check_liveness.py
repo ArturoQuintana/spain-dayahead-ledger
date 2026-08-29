@@ -26,14 +26,28 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from talea import markets as registry  # noqa: E402
+from talea.loop import load_prices  # noqa: E402
 
 STALE_HOURS = 48.0
+PRICE_STALE_DAYS = 2   # a market whose NEWEST PRICE is older than this has a
+# broken/stalled fetch. This catches the class the receipt-only check misses: a
+# LAUNCHED market whose fetcher silently fails commits nothing, so it hides as the
+# exempt NEVER even though it is actually broken (e.g. GB's Elexon 7-day-window
+# 400s, 2026-08-29 — invisible to every check because a market with no data has
+# nothing to verify AND no receipt to be "stale"). Stale prices are unambiguous:
+# a working day-ahead fetch always advances to ~today/tomorrow.
+
+
+def newest_price_date(prices_path: Path) -> date | None:
+    """Newest local price date in a market's dataset, or None if it has none."""
+    prices = load_prices(prices_path)
+    return date.fromisoformat(max(prices)[:10]) if prices else None
 
 
 def newest_commit(receipts_path: Path) -> datetime | None:
@@ -52,22 +66,37 @@ def newest_commit(receipts_path: Path) -> datetime | None:
 
 
 def market_liveness(slug: str, receipts_path: Path, now: datetime,
-                    stale_hours: float = STALE_HOURS) -> dict:
+                    stale_hours: float = STALE_HOURS,
+                    prices_path: Path | None = None) -> dict:
+    npd = newest_price_date(prices_path) if prices_path is not None else None
+    price_age_d = (now.date() - npd).days if npd is not None else None
+    fetch_stale = price_age_d is not None and price_age_d > PRICE_STALE_DAYS
     nc = newest_commit(receipts_path)
     if nc is None:
-        return {"slug": slug, "last_commit": None, "age_h": None, "state": "NEVER"}
+        # NEVER-committed: normally exempt (onboarding), BUT if its prices have
+        # gone stale the fetcher is broken, not onboarding — that is STALE.
+        return {"slug": slug, "last_commit": None, "age_h": None,
+                "price_age_d": price_age_d, "fetch_stale": fetch_stale,
+                "state": "STALE" if fetch_stale else "NEVER"}
     age_h = (now - nc).total_seconds() / 3600.0
+    stale = age_h > stale_hours or fetch_stale
     return {"slug": slug, "last_commit": nc, "age_h": age_h,
-            "state": "STALE" if age_h > stale_hours else "HEALTHY"}
+            "price_age_d": price_age_d, "fetch_stale": fetch_stale,
+            "state": "STALE" if stale else "HEALTHY"}
 
 
 def assess(markets, now: datetime, stale_hours: float = STALE_HOURS) -> list[dict]:
-    return [market_liveness(m.slug, m.receipts_path, now, stale_hours) for m in markets]
+    return [market_liveness(m.slug, m.receipts_path, now, stale_hours,
+                            prices_path=getattr(m, "prices_path", None))
+            for m in markets]
 
 
 def _fmt(r: dict) -> str:
     if r["state"] == "NEVER":
         return f"  NEVER    {r['slug']:6} — no receipts yet"
+    if r.get("fetch_stale"):
+        return (f"  STALE    {r['slug']:6} — prices {r['price_age_d']}d stale "
+                f"(fetcher stopped)")
     return f"  {r['state']:8} {r['slug']:6} — last commit {r['age_h']:.1f}h ago"
 
 
@@ -87,8 +116,8 @@ def main(argv: list[str] | None = None, market_list=None, now: datetime | None =
         if not a.quiet or r["state"] != "HEALTHY":
             print(_fmt(r))
     if stale:
-        print(f"-> STALE: {', '.join(r['slug'] for r in stale)} "
-              f"(no receipt in >{a.stale_hours:.0f}h)")
+        print(f"-> STALE (writer or fetcher stopped): "
+              f"{', '.join(r['slug'] for r in stale)}")
     elif never:
         print(f"-> all live; NEVER (info): {', '.join(r['slug'] for r in never)}")
     else:

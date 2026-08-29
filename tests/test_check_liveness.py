@@ -113,3 +113,39 @@ def test_assess_maps_all_markets(tmp_path):
     markets = [_receipts(tmp_path, "es", [1.0]), _receipts(tmp_path, "de", [99.0])]
     rows = cl.assess(markets, NOW)
     assert {r["slug"]: r["state"] for r in rows} == {"es": "HEALTHY", "de": "STALE"}
+
+
+# ---- price-staleness = a broken fetcher (the GB class, 2026-08-29) ------------
+
+def _with_prices(m, tmp_path, days_old):
+    """Attach a prices.json whose newest price is `days_old` days before NOW."""
+    pp = tmp_path / f"{m.slug}_prices.json"
+    d = (NOW.date() - timedelta(days=days_old)).isoformat()
+    pp.write_text(json.dumps([{"ts": f"{d}T00", "price": 50.0}]))
+    m.prices_path = pp
+    return m
+
+
+def test_stale_prices_flag_a_broken_fetch_even_when_never_committed(tmp_path):
+    """GB class: a launched market whose fetcher silently 400s commits nothing, so
+    the receipt-only check exempts it as NEVER — but its prices stop advancing.
+    Stale prices must promote it to STALE (a page), closing the blind spot."""
+    m = _with_prices(_receipts(tmp_path, "gb", None), tmp_path, days_old=5)  # no receipts
+    r = cl.market_liveness(m.slug, m.receipts_path, NOW, prices_path=m.prices_path)
+    assert r["state"] == "STALE" and r["fetch_stale"] is True
+
+
+def test_fresh_prices_never_committed_stays_never(tmp_path):
+    """Genuinely onboarding (fetch works -> fresh prices, first receipt pending)
+    must NOT false-alarm."""
+    m = _with_prices(_receipts(tmp_path, "gb", None), tmp_path, days_old=0)
+    r = cl.market_liveness(m.slug, m.receipts_path, NOW, prices_path=m.prices_path)
+    assert r["state"] == "NEVER" and r["fetch_stale"] is False
+
+
+def test_stale_prices_promote_a_recently_committing_market_to_stale(tmp_path):
+    """Even a market that recently committed is STALE if its prices then froze
+    (fetch broke after working)."""
+    m = _with_prices(_receipts(tmp_path, "de", [10.0]), tmp_path, days_old=6)
+    r = cl.market_liveness(m.slug, m.receipts_path, NOW, prices_path=m.prices_path)
+    assert r["state"] == "STALE" and r["fetch_stale"] is True

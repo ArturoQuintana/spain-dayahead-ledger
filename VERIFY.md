@@ -17,14 +17,17 @@ Not every market carries the same strength of evidence yet; stated plainly:
 
 - **es** — OTS-anchored (Bitcoin) from 2026-08-08; git-corroborated from
   2026-07-30. The full three-tier story is in section 1.
-- **de** — OTS-anchored (Bitcoin) from 2026-08-27; the earlier days
-  (2026-08-24 → 08-26) are git-attested only. **Evidence boundary (parallel to
+- **de** — OTS-stamped from 2026-08-27, but the proofs are still **"pending"**
+  (not yet Bitcoin-anchored — 1-2 days old; the weekly `ots upgrade` matures
+  them, same as ERCOT below); the earlier days (2026-08-24 → 08-26) are
+  git-attested only. **Evidence boundary (parallel to
   ES's above):** DE ran first on its own public mirror (`germany-dayahead-ledger`,
   now frozen) and in the private code repo; DE's history entered THIS consolidated
   `talea` repo as a single bulk sync at the 2026-08-29 one-project consolidation.
   So the timing "weak check" (comparing a receipt's `committed_at` to the push
   time of the commit that introduced it) does NOT corroborate pre-2026-08-29 DE
-  dates *from this repo alone* — use the OTS anchors (08-27+), or the per-tick
+  dates *from this repo alone* — use the OTS proofs (08-27+, pending Bitcoin
+  upgrade), or the per-tick
   history in the private repo / the frozen `germany-dayahead-ledger` mirror (shown
   on request). Arithmetic and append-only hold regardless.
 - **ercot** — newly launched (2026-08-27); OTS-stamped from its first tick,

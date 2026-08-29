@@ -95,8 +95,8 @@
     <p class="eyebrow">Talea · paper-trading ledger</p>
     <h1>German (DE-LU) day-ahead battery arbitrage</h1>
     <p class="asof">1 MW / 2 MWh virtual battery · decisions committed before price publication
-      (leak-guarded, OpenTimestamps-anchored) · data as of <code>2026-08-29 20:15 Berlin</code> ·
-      generated from the audit files, no hand-edited numbers</p>
+      (leak-guarded, OpenTimestamps-stamped &mdash; Bitcoin&#8209;confirmed within days) ·
+      data as of <code>2026-08-29 21:12 Berlin</code> · generated from the audit files, no hand-edited numbers</p>
   </header>
 
   <div class="tiles">
@@ -159,7 +159,10 @@
       Kendall tau-b of the committed forecast vs the actual day.</p>
     <p>Paper money — no capital at stake. Every receipt is committed and
       pushed before the D+1 auction publishes (~13:15 CET); the ledger is
-      append-only and OpenTimestamps-anchored; prices: Bundesnetzagentur | SMARD.de (CC BY 4.0).
+      append-only and OpenTimestamps-stamped — each day's proof is submitted at
+      commit and Bitcoin-confirmed within days (a fresh proof is <i>pending</i>
+      until a block lands; see VERIFY.md for per-date confirmed/pending status);
+      prices: Bundesnetzagentur | SMARD.de (CC BY 4.0).
       Absolute EUR is an <b>upper bound</b> (exchange fees only — no grid
       charges, taxes, or aggregator margin); relative metrics are robust.
       Verify everything yourself: see VERIFY.md in this repository.</p>
