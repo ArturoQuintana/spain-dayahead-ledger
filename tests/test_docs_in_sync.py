@@ -61,20 +61,45 @@ def test_architecture_table_flags_match_the_registry():
             f"{slug} driver flag drift: {line}"
 
 
-def test_es_mirror_is_deny_by_default_allowlist():
-    """Incident 2026-08-28: FR (private, derived-only) leaked to the PUBLIC ES
-    mirror through a DENY-LIST gap — fr/ was never added to the excludes. The
-    ES-data publish must instead be a POSITIVE ALLOWLIST (deny-by-default): a
-    terminal --exclude='*' so anything not explicitly named cannot leak, and NO
-    non-es market may be explicitly included. A new market or a stray root file is
-    then excluded because it is not on the list — leaking requires consciously
-    adding it, not forgetting to exclude it."""
+def test_every_public_market_has_a_colocated_data_licence():
+    """Licensing travels with the data: each PUBLISHED market carries its own
+    Data/<slug>/LICENSE.md (source + licence + attribution) and is indexed in
+    DATA-SOURCES.md. A public market missing its licence file could redistribute
+    third-party price data with no attribution — a licence breach. (Private
+    markets are never published, so they need no public licence file.)"""
+    from esios_paper.markets import public_markets
+    index = (ROOT / "DATA-SOURCES.md").read_text()
+    for m in public_markets():
+        lic = ROOT / "Data" / m.slug / "LICENSE.md"
+        assert lic.exists(), \
+            f"public market {m.slug!r} has no Data/{m.slug}/LICENSE.md"
+        assert f"Data/{m.slug}/" in index, \
+            f"{m.slug!r} is public but missing from the DATA-SOURCES.md index"
+
+
+def test_mirror_is_deny_by_default_allowlist():
+    """Incident 2026-08-28: FR (private, derived-only) leaked to the PUBLIC mirror
+    through a DENY-LIST gap — fr/ was never added to the excludes. The Talea mirror
+    (one project, all public markets under Data/<slug>/) must be a POSITIVE
+    ALLOWLIST (deny-by-default): a terminal --exclude='*' so anything not named
+    cannot leak, per-market includes REGISTRY-DERIVED (a loop over
+    `markets --public`) so no PRIVATE market is ever named, and a fail-safe that
+    skips publishing when the lookup is empty (so a bad lookup can never
+    --delete-excluded the whole mirror). Leaking a private market now requires
+    flagging it public in the registry, not forgetting an exclude."""
+    from esios_paper.markets import public_markets
     txt = (ROOT / "scripts" / "publish_mirror.sh").read_text()
     assert "--exclude='*'" in txt, \
-        "ES-mirror publish must end in a deny-all --exclude='*' (allowlist posture)"
+        "mirror publish must end in a deny-all --exclude='*' (allowlist posture)"
+    assert "for s in $SLUGS" in txt and '--include="/$s/***"' in txt, \
+        ("public-market includes must be REGISTRY-DERIVED (loop over "
+         "`markets --public`), not hardcoded per market")
+    assert 'if [ -z "$SLUGS" ]' in txt, \
+        "mirror publish must fail-safe (skip) when the public-market lookup is empty"
+    public = {m.slug for m in public_markets()}
     for slug in MARKETS:
-        if slug == "es":
+        if slug in public:
             continue
-        assert f"--include='/{slug}/" not in txt and f"--include=/{slug}/" not in txt, \
-            (f"{slug!r} is explicitly --include'd in a mirror allowlist; only es "
-             f"belongs on the ES mirror (see the FR leak).")
+        assert f"--include='/{slug}/" not in txt and f'--include="/{slug}/' not in txt, \
+            (f"{slug!r} is PRIVATE but explicitly --include'd in the mirror "
+             f"allowlist — a private market must never be published.")

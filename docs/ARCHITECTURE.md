@@ -8,7 +8,7 @@ money-denominated results to an append-only ledger, anchors everything in
 Bitcoin via OpenTimestamps, and republishes a public, auditable dashboard. It
 is a measurement instrument: the product is a track record that cannot be
 faked, revised, or cherry-picked. Spain is the primary market; the same loop
-now runs five markets (see "Markets" below). Governance (who may change what,
+now runs eight markets (see "Markets" below). Governance (who may change what,
 and how claims are verified) is in CLAUDE.md; outsider verification in
 VERIFY.md.
 
@@ -16,7 +16,7 @@ VERIFY.md.
 
 The loop is market-agnostic (a frozen `Market` dataclass parameterizes zone,
 timezone, commit deadline, currency, Data/<slug>/ tree, and fetch client — the
-strategy panel, P&L math, and guards are shared). Six markets run today:
+strategy panel, P&L math, and guards are shared). Eight markets run today:
 
     market  zone      source / license               cur  deadline  writer        public tier
     ES      Spain     apidatos.ree.es · public        EUR  13:00     server        Pages + Bitcoin-OTS
@@ -24,14 +24,17 @@ strategy panel, P&L math, and guards are shared). Six markets run today:
     IT      IT-SUD    ENTSO-E A44 · token, derived    EUR  12:00     server        private (license)
     PT      PT        ENTSO-E A44 · token, derived    EUR  12:00     server        private (license)
     FR      France    ENTSO-E A44 · token, derived    EUR  12:00     server        private (license)
-    ERCOT   HB_NORTH  ERCOT MIS NP4-190 · public/redist USD 10:00    GitHub Actions private + OTS
+    GB      GB        Elexon BMRS · open (Insights)   GBP  11:00     server        Pages (git-attested)
+    JP      JEPX      JEPX spot · open (attribution)  JPY  10:00     GitHub Actions private (silent-first; redistributable)
+    ERCOT   HB_NORTH  ERCOT MIS NP4-190 · public/redist USD 10:00    GitHub Actions Pages (git-attested)
 
-Two writers, not one: the server writes ES/DE/IT/PT/FR; ERCOT is driven from
-GitHub Actions US runners (ERCOT DAM geo-blocks EU IPs). Both push directly to
+Two writers, not one: the server writes ES/DE/IT/PT/FR/GB; ERCOT and JP are driven from
+GitHub Actions runners (ERCOT DAM geo-blocks EU IPs; JEPX publishes ~10:10 JST,
+the European night). Both push directly to
 `main`; the `main-protection` ruleset blocks force-push and branch deletion so
 the append-only trail cannot be rewritten. IT/PT/FR are private because ENTSO-E
 day-ahead is not freely redistributable (derived-metrics-only if ever
-published); ERCOT is redistributable and could go public later. Historical
+published); ES, DE, GB, and ERCOT are PUBLIC — all four on ONE Talea mirror repo (one project, each market a first-class page + Data/<slug>/ under it; render_dashboard.py --site, registry-derived deny-by-default allowlist). JP stays private (silent-first) pending its JEPX-licence confirmation. Historical
 cross-market capture is in docs/backtest-markets-2026-08.md.
 
 The `markets/` package is the SINGLE SOURCE OF TRUTH (Phase 0, 2026-08-27; became
@@ -44,7 +47,7 @@ CONTRACT (the `Fetcher` protocol + the re-exported `Market`/`Presentation` types
 which stay defined in the `loop.py` core) lives in `markets/base.py`. Drift is
 caught by `test_market_registry.py` + `test_market_conformance.py` (every market
 has its guards) + `test_docs_in_sync` (this table must match the registry's flags).
-Per-market VERTICAL modules (`markets/<slug>/`): **all six markets are vertical
+Per-market VERTICAL modules (`markets/<slug>/`): **all seven markets are vertical
 modules now** (Phase 2 code refactor complete), and **ES data lives at `Data/es/`
 like every other market** (Stage B, 2026-08-28) — `Data/` root holds only
 shared/project artifacts (`esios_prices.json` deep history, `calibration/`) plus one
@@ -100,7 +103,7 @@ library. See docs/market-plugin-refactor-plan.md.
     tools/esios-fetcher/   route-B client (token, PriceDay contract, own tests)
     scripts/               server_tick, weekly_maintenance, publish_mirror,
                            render_dashboard, backtest, compare, crosscheck
-    tests/                 162 tests, failure-mode-first (see "Test suite" below)
+    tests/                 failure-mode-first (see "Test suite" below)
     Data/                  the product (see Data flow)
 
 ## Call flow of one tick (loop.tick, via __main__.cmd_tick)

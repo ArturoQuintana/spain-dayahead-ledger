@@ -49,9 +49,17 @@ from .ercot import MARKET as ERCOT  # noqa: E402
 # this same shape in Phase 2.
 from .fr import MARKET as FR  # noqa: E402
 
+# Great Britain: Elexon BMRS (redistributable/open), SILENT-FIRST (public=False).
+# The shortlist's #1; first market on the finished plugin architecture (2026-08-28).
+from .gb import MARKET as GB  # noqa: E402
+
+# Japan: JEPX spot (redistributable/attribution), SILENT-FIRST, driver="actions"
+# (publishes ~10:10 JST = European night — GitHub Actions ticks it, like ERCOT).
+from .jp import MARKET as JP  # noqa: E402
+
 # Registry by slug. Order: primary first, then shadows in digest order (ENTSO-E
-# EU-derived markets it/pt/fr grouped; ERCOT — the USD/Actions market — last).
-MARKETS = {m.slug: m for m in (ES, DE, IT, PT, FR, ERCOT)}
+# EU-derived it/pt/fr grouped; GB; JP; ERCOT — the two Actions/US-JP markets last).
+MARKETS = {m.slug: m for m in (ES, DE, IT, PT, FR, GB, JP, ERCOT)}
 
 
 # --- registry queries: the ONLY way operational surfaces should enumerate ---

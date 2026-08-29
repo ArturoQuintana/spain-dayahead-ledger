@@ -22,13 +22,15 @@ NAMES = {"battery-2h2h-persistence": "Persistence v1",
          "battery-2h2h-rankblend": "Rank-blend v1",
          "battery-2h2h-weekly": "Weekly v1"}
 GATE_DAYS = 21
+CUR_SYMBOL = {"EUR": "€", "GBP": "£", "USD": "$", "JPY": "¥"}
 
 # Per-market presentation is DERIVED from the market registry (the single source
 # of truth) — not a hardcoded dict (Phase 0, 2026-08-27). Every renderable market
 # appears automatically; ES presentation strings live on the ES market and are
 # byte-for-byte what this dict used to hold, so the public page is unchanged.
 sys.path.insert(0, str(ROOT / "src"))
-from esios_paper.markets import MARKETS as _REGISTRY   # noqa: E402
+from esios_paper.markets import (   # noqa: E402
+    MARKETS as _REGISTRY, public_markets as _public_markets)
 
 
 def _presentation_config() -> dict[str, dict]:
@@ -39,7 +41,8 @@ def _presentation_config() -> dict[str, dict]:
             continue
         out[slug] = {"data": m.prices_path.parent, "title": p.title,
                      "tzlabel": p.tz_label, "gate": p.show_gate,
-                     "source": p.source, "tab": p.tab_name}
+                     "source": p.source, "tab": p.tab_name,
+                     "currency": m.currency}
     return out
 
 
@@ -64,15 +67,127 @@ def fmt(x: float) -> str:
     return f"{x:,.2f}"
 
 
+# Shared design tokens for the landing index and the awaiting-market pages (the
+# full per-market TEMPLATE carries its own copy). These f-string-embedded blocks
+# are NOT %-formatted, so literal % needs no escaping.
+BASE_TOKENS = """<style>
+  :root { color-scheme: light;
+    --bg:#f9f9f7; --card:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e;
+    --muted:#898781; --grid:#e1e0d9; --border:rgba(11,11,11,.10);
+    --good:#006300; --accent:#2a78d6;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) {
+    color-scheme:dark; --bg:#0d0d0d; --card:#1a1a19; --ink:#fff; --ink2:#c3c2b7;
+    --grid:#2c2c2a; --border:rgba(255,255,255,.10); --good:#0ca30c; --accent:#3987e5; } }
+  :root[data-theme="dark"] {
+    color-scheme:dark; --bg:#0d0d0d; --card:#1a1a19; --ink:#fff; --ink2:#c3c2b7;
+    --grid:#2c2c2a; --border:rgba(255,255,255,.10); --good:#0ca30c; --accent:#3987e5; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    line-height:1.5; -webkit-font-smoothing:antialiased; }
+  a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+  .wrap { max-width:920px; margin:0 auto; padding:40px 22px 64px; }
+  header { margin-bottom:26px; }
+  .eyebrow { font:600 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted); margin:0 0 12px; }
+  h1 { font-size:30px; line-height:1.15; margin:0 0 12px; letter-spacing:-.02em;
+    text-wrap:balance; }
+  h2 { font-size:15px; margin:34px 0 12px; letter-spacing:-.01em; }
+  .asof { color:var(--ink2); font-size:13.5px; margin:0; max-width:60ch; }
+  code { font-family:var(--mono); font-size:.92em; }
+  .banner { background:var(--card); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px; font-size:13.5px; color:var(--ink2); margin:22px 0 6px; }
+  .banner b { color:var(--ink); }
+  .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); }
+  .mkt { display:block; background:var(--card); border:1px solid var(--border);
+    border-radius:12px; padding:18px 18px 16px; color:inherit; transition:border-color .12s; }
+  .mkt:hover { border-color:var(--accent); text-decoration:none; }
+  .mkt .name { font-size:16px; font-weight:600; color:var(--ink); margin:0 0 2px; }
+  .mkt .zone { font:11px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); }
+  .mkt .big { font-size:26px; font-weight:600; margin:14px 0 2px; font-variant-numeric:tabular-nums; }
+  .mkt .big.pos { color:var(--good); }
+  .mkt .sub { font-size:12.5px; color:var(--ink2); }
+  .mkt .status { display:inline-block; margin-top:12px; font:11px/1 var(--mono);
+    letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .open-card { background:var(--card); border:1px solid var(--border); border-radius:10px;
+    padding:12px 14px; display:flex; flex-wrap:wrap; gap:6px 14px; align-items:baseline; }
+  .open-card .pending { font:600 10.5px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
+    color:var(--accent); }
+  .open-card .oc { font-size:12.5px; color:var(--ink2); }
+  .open-card .m, .open-card b.m { font-family:var(--mono); font-size:12px; color:var(--ink); }
+  footer { margin-top:44px; color:var(--muted); font-size:12.5px; line-height:1.7; }
+</style>"""
+
+
+def _open_cards(receipts: list[dict], settled_keys: set) -> list[str]:
+    """The 'committed before truth' cards — receipts with no settlement yet."""
+    open_receipts = [r for r in receipts
+                     if (r["target"], r["strategy"]) not in settled_keys]
+    open_html = []
+    for r in sorted(open_receipts, key=lambda r: (r["target"], r["strategy"])):
+        open_html.append(
+            f'<div class="open-card" style="margin-bottom:10px">'
+            f'<span class="pending">Pending</span>'
+            f'<span class="oc"><b>{r["target"]}</b> · {NAMES.get(r["strategy"], r["strategy"])}'
+            f'{" · primary" if r["strategy"] == PRIMARY else " · shadow"}</span>'
+            f'<span class="oc">buy <b class="m">{"·".join(f"{h:02d}" for h in r["buy_hours"])}h</b>'
+            f' · sell <b class="m">{"·".join(f"{h:02d}" for h in r["sell_hours"])}h</b></span>'
+            f'<span class="oc">committed <span class="m">{r["committed_at"][:16]}Z</span>,'
+            f' before publication</span></div>')
+    return open_html
+
+
+def _awaiting(slug: str, cfg: dict, receipts: list[dict], now: datetime,
+              cur: str) -> str:
+    """Public page for a live market with no settled day yet: the receipts are
+    already committed-before-truth; only the settlement/P&L is pending. This is
+    the honest live state (GB just launched; ERCOT has committed receipts but no
+    published prices to settle against yet)."""
+    open_html = _open_cards(receipts, set())
+    if not open_html:
+        open_html = ['<div class="open-card"><span class="pending">None yet'
+                     '</span><span class="oc">First receipt commits at the next '
+                     'pre-auction tick; watch this page.</span></div>']
+    asof = now.strftime(f"%Y-%m-%d %H:%M {cfg['tzlabel']}")
+    src = cfg.get("source", "")
+    return f"""{BASE_TOKENS}<title>{cfg['tab']} day-ahead ledger</title>
+<div class="wrap">
+  <header>
+    <p class="eyebrow"><a href="index.html">Talea</a> · {slug.upper()}</p>
+    <h1>{cfg['title']}</h1>
+    <p class="asof">1&nbsp;MW / 2&nbsp;MWh virtual battery · decisions committed
+      before price publication (leak-guarded, OpenTimestamps-anchored) ·
+      as of <code>{asof}</code></p>
+  </header>
+  <div class="banner"><b>Live · awaiting first settled day.</b> The receipts
+    below are already committed and pushed <i>before</i> the auction publishes —
+    that is the whole point. Settlement (P&amp;L vs the realised prices) appears
+    here the day after the first target day publishes; nothing is backfilled.</div>
+  <h2>Committed receipts · awaiting settlement</h2>
+  {chr(10).join(open_html)}
+  <footer>
+    <p>Paper money — no capital at stake. Prices: {src}. The ledger is
+      append-only and OpenTimestamps-anchored; verify everything yourself —
+      see VERIFY.md in this repository.</p>
+  </footer>
+</div>"""
+
+
 def build(slug: str = "es") -> str:
     cfg = MARKETS[slug]
     DATA = cfg["data"]
+    cur = CUR_SYMBOL.get(cfg["currency"], cfg["currency"])
+    curcode = cfg["currency"]
     ledger = jsonl(DATA / "ledger.jsonl")
     receipts = jsonl(DATA / "receipts.jsonl")
-    curves = day_curves(DATA)
     now = datetime.now(ZoneInfo("Europe/Madrid"))
 
     prim = [e for e in ledger if e["strategy"] == PRIMARY]
+    if not prim:
+        return _awaiting(slug, cfg, receipts, now, cur)
+    curves = day_curves(DATA)
     prim_by_day = {e["target"]: e for e in prim}
     total = sum(e["pnl_eur"] for e in prim)
     oracle_total = sum(e["oracle_pnl_eur"] for e in prim)
@@ -93,8 +208,6 @@ def build(slug: str = "es") -> str:
         d += timedelta(days=1)
 
     settled_keys = {(e["target"], e["strategy"]) for e in ledger}
-    open_receipts = [r for r in receipts
-                     if (r["target"], r["strategy"]) not in settled_keys]
 
     # day cards for the primary (curve + basis curve joined from receipts)
     prim_receipt_by_target = {r["target"]: r for r in receipts
@@ -136,7 +249,7 @@ def build(slug: str = "es") -> str:
                        if e.get("capture") is not None else "n/a")
                 tau = (f" · tau {e['tau']:.3f}"
                        if e.get("tau") is not None else "")
-                cells.append(f"<td>+{fmt(e['pnl_eur'])}&thinsp;€ ({cap}{tau})"
+                cells.append(f"<td>+{fmt(e['pnl_eur'])}&thinsp;{cur} ({cap}{tau})"
                              "</td>")
         h2h_rows.append(f'<tr><td class="k">{t}</td>{"".join(cells)}</tr>')
     # pairwise totals vs primary on shared days
@@ -149,7 +262,7 @@ def build(slug: str = "es") -> str:
         if shared:
             delta = sum(a - b for a, b in shared)
             pair_notes.append(f"{NAMES[s]} vs {NAMES[PRIMARY]}: "
-                              f"{delta:+.2f}&thinsp;€ over {len(shared)} "
+                              f"{delta:+.2f}&thinsp;{cur} over {len(shared)} "
                               "shared days")
     h2h_head = "".join(f"<th>{NAMES[s]}{' · primary' if s == PRIMARY else ' · shadow'}</th>"
                        for s in strategies)
@@ -174,17 +287,7 @@ def build(slug: str = "es") -> str:
             'left">missed — no receipt committed before the window closed; '
             "never backfilled (leak guard)</td><td>—</td></tr>")
 
-    open_html = []
-    for r in open_receipts:
-        open_html.append(
-            f'<div class="open-card" style="margin-bottom:10px">'
-            f'<span class="pending">Pending</span>'
-            f'<span class="oc"><b>{r["target"]}</b> · {NAMES.get(r["strategy"], r["strategy"])}'
-            f'{" · primary" if r["strategy"] == PRIMARY else " · shadow"}</span>'
-            f'<span class="oc">buy <b class="m">{"·".join(f"{h:02d}" for h in r["buy_hours"])}h</b>'
-            f' · sell <b class="m">{"·".join(f"{h:02d}" for h in r["sell_hours"])}h</b></span>'
-            f'<span class="oc">committed <span class="m">{r["committed_at"][:16]}Z</span>,'
-            f' before publication</span></div>')
+    open_html = _open_cards(receipts, settled_keys)
     if not open_html:
         open_html = ['<div class="open-card"><span class="pending">None open'
                      '</span><span class="oc">Next commit at the next 11:00 '
@@ -214,6 +317,7 @@ def build(slug: str = "es") -> str:
     return TEMPLATE % {
         "tabtitle": cfg["tab"] + " day-ahead ledger",
         "title": cfg["title"],
+        "cur": cur, "curcode": curcode,
         "source": cfg.get("source", "apidatos.ree.es"),
         "asof": now.strftime(f"%Y-%m-%d %H:%M {cfg['tzlabel']}"),
         "total": fmt(total), "oracle_total": fmt(oracle_total),
@@ -311,7 +415,7 @@ TEMPLATE = """<title>%(tabtitle)s</title>
 
 <div class="wrap">
   <header>
-    <p class="eyebrow">esios-paper · paper-trading ledger</p>
+    <p class="eyebrow">Talea · paper-trading ledger</p>
     <h1>%(title)s</h1>
     <p class="asof">1 MW / 2 MWh virtual battery · decisions committed before price publication
       (leak-guarded, OpenTimestamps-anchored) · data as of <code>%(asof)s</code> ·
@@ -320,8 +424,8 @@ TEMPLATE = """<title>%(tabtitle)s</title>
 
   <div class="tiles">
     <div class="tile"><div class="k">Net P&amp;L · paper</div>
-      <div class="v pos">+%(total)s&thinsp;€</div>
-      <div class="s">of %(oracle_total)s&thinsp;€ oracle ceiling</div></div>
+      <div class="v pos">+%(total)s&thinsp;%(cur)s</div>
+      <div class="s">of %(oracle_total)s&thinsp;%(cur)s oracle ceiling</div></div>
     <div class="tile"><div class="k">Mean capture</div>
       <div class="v">%(cap_mean)s%%</div>
       <div class="s">of perfect-hindsight P&amp;L</div></div>
@@ -360,14 +464,14 @@ TEMPLATE = """<title>%(tabtitle)s</title>
 
   <footer>
     <p>Costs are explicit in every figure: 85%% round-trip efficiency and
-      0.50&thinsp;€/MWh fees on every MWh moved — net is never reported as
+      0.50&thinsp;%(cur)s/MWh fees on every MWh moved — net is never reported as
       gross. The oracle is the best possible 2×2 hour choice with hindsight,
       same battery, same costs. Capture = P&amp;L ÷ oracle P&amp;L; tau =
       Kendall tau-b of the committed forecast vs the actual day.</p>
     <p>Paper money — no capital at stake. Every receipt is committed and
       pushed before the D+1 auction publishes (~13:15 CET); the ledger is
       append-only and OpenTimestamps-anchored; prices: %(source)s.
-      Absolute EUR is an <b>upper bound</b> (exchange fees only — no grid
+      Absolute %(curcode)s is an <b>upper bound</b> (exchange fees only — no grid
       charges, taxes, or aggregator margin); relative metrics are robust.
       Verify everything yourself: see VERIFY.md in this repository.</p>
   </footer>
@@ -413,15 +517,15 @@ TEMPLATE = """<title>%(tabtitle)s</title>
       <div class="day-head">
         <span class="date">${d.target}</span><span class="wd">${d.weekday}</span>
         <span class="chips">
-          <span class="chip ${d.pnl >= 0 ? "pnl-pos" : "pnl-neg"}">${d.pnl >= 0 ? "+" : "−"}${fmt(Math.abs(d.pnl))} €</span>
+          <span class="chip ${d.pnl >= 0 ? "pnl-pos" : "pnl-neg"}">${d.pnl >= 0 ? "+" : "−"}${fmt(Math.abs(d.pnl))} %(cur)s</span>
           <span class="chip">capture ${d.capture != null ? (d.capture * 100).toFixed(1) + "%%" : "n/a"}</span>
           ${d.tau != null ? `<span class="chip">tau ${d.tau.toFixed(3)}</span>` : ""}
         </span>
       </div>
       <p class="day-sub">Bought <span class="m">${d.buy.map(hh).join("·")}h</span> at avg
-        <span class="m">${fmt(buyAvg)} €/MWh</span>, sold <span class="m">${d.sell.map(hh).join("·")}h</span> at avg
-        <span class="m">${fmt(sellAvg)} €/MWh</span> — hours picked from ${d.basisDate}'s profile.
-        Oracle best: <span class="m">${fmt(d.oracle)} €</span>.</p>
+        <span class="m">${fmt(buyAvg)} %(cur)s/MWh</span>, sold <span class="m">${d.sell.map(hh).join("·")}h</span> at avg
+        <span class="m">${fmt(sellAvg)} %(cur)s/MWh</span> — hours picked from ${d.basisDate}'s profile.
+        Oracle best: <span class="m">${fmt(d.oracle)} %(cur)s</span>.</p>
       <div class="chart-box" data-day="${d.target}">
         <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly prices for ${d.target}">
           ${grid}${xlab}
@@ -440,7 +544,7 @@ TEMPLATE = """<title>%(tabtitle)s</title>
   }
   document.getElementById("days").innerHTML = DAYS.map(dayCard).join("");
   document.getElementById("legend").innerHTML = [
-    ['<svg width="22" height="10"><line x1="0" x2="22" y1="5" y2="5" stroke="var(--ink2)" stroke-width="2"/></svg>', "target-day price (€/MWh)"],
+    ['<svg width="22" height="10"><line x1="0" x2="22" y1="5" y2="5" stroke="var(--ink2)" stroke-width="2"/></svg>', "target-day price (%(cur)s/MWh)"],
     ['<svg width="22" height="10"><line x1="0" x2="22" y1="5" y2="5" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="3 4"/></svg>', "basis day — the decision input"],
     ['<svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="var(--buy)"/></svg>', "committed buy hours"],
     ['<svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="var(--sell)"/></svg>', "committed sell hours"],
@@ -457,8 +561,8 @@ TEMPLATE = """<title>%(tabtitle)s</title>
       xh.setAttribute("x1", X(h)); xh.setAttribute("x2", X(h)); xh.style.display = "";
       pt.setAttribute("cx", X(h)); pt.setAttribute("cy", Y(d.prices[h])); pt.style.display = "";
       const role = d.buy.includes(h) ? " · BUY" : d.sell.includes(h) ? " · SELL" : "";
-      tip.innerHTML = `${hh(h)}:00${role}<br><span class="t2">day&nbsp;</span>${fmt(d.prices[h])} €/MWh` +
-                      `<br><span class="t2">basis</span> ${fmt(d.basis[h])} €/MWh`;
+      tip.innerHTML = `${hh(h)}:00${role}<br><span class="t2">day&nbsp;</span>${fmt(d.prices[h])} %(cur)s/MWh` +
+                      `<br><span class="t2">basis</span> ${fmt(d.basis[h])} %(cur)s/MWh`;
       tip.style.display = "block";
       const bx = (X(h) / W) * r.width;
       tip.style.left = Math.min(r.width - 150, Math.max(4, bx + 12)) + "px";
@@ -472,8 +576,69 @@ TEMPLATE = """<title>%(tabtitle)s</title>
 """
 
 
+def _primary_slug() -> str:
+    """The primary market (its page is index.html; others are <slug>.html)."""
+    return next((m.slug for m in _REGISTRY.values() if m.primary), "es")
+
+
+def _href(slug: str, primary: str) -> str:
+    return "index.html" if slug == primary else f"{slug}.html"
+
+
+NAV_STYLE = """<style>
+.talea-nav{display:flex;gap:10px 18px;align-items:baseline;flex-wrap:wrap;
+  max-width:920px;margin:0 auto;padding:18px 22px 0;
+  font-family:var(--mono,ui-monospace,monospace);}
+.talea-nav .brand{font-weight:700;letter-spacing:.04em;font-size:14px;
+  color:var(--ink,#111);text-decoration:none;}
+.talea-nav .mkts{display:flex;gap:14px;flex-wrap:wrap;}
+.talea-nav a{color:var(--ink2,#666);text-decoration:none;font-size:12.5px;
+  letter-spacing:.03em;}
+.talea-nav a:hover{color:var(--ink,#111);}
+.talea-nav a.here{color:var(--ink,#111);font-weight:600;
+  border-bottom:2px solid var(--ink,#111);padding-bottom:2px;}
+</style>"""
+
+
+def _nav(slugs: list[str], current: str, primary: str) -> str:
+    """A neutral cross-market strip: the Talea wordmark + one link per public
+    market (the current one marked). NOT a landing page — each market's own page
+    stays first-class; this is only connective tissue so the markets read as one
+    project. The primary market keeps the root URL (index.html)."""
+    links = []
+    for s in slugs:
+        here = ' class="here"' if s == current else ''
+        links.append(f'<a href="{_href(s, primary)}"{here}>{MARKETS[s]["tab"]}</a>')
+    links = "".join(links)
+    return (NAV_STYLE
+            + f'<nav class="talea-nav"><a class="brand" '
+              f'href="{_href(primary, primary)}">Talea</a>'
+              f'<span class="mkts">{links}</span></nav>')
+
+
+def _page(inner: str, nav: str = "") -> str:
+    return ("<!doctype html><html><head><meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,"
+            "initial-scale=1\"></head><body>" + nav + inner + "</body></html>")
+
+
 def main() -> None:
     args = [a for a in sys.argv[1:]]
+    if "--site" in args:
+        i = args.index("--site")
+        outdir = Path(args[i + 1])
+        del args[i:i + 2]
+        outdir.mkdir(parents=True, exist_ok=True)
+        slugs = [m.slug for m in _public_markets()]
+        primary = _primary_slug()
+        for slug in slugs:
+            page = _page(build(slug), _nav(slugs, slug, primary))
+            fname = "index.html" if slug == primary else f"{slug}.html"
+            (outdir / fname).write_text(page)
+            print(f"rendered {outdir / fname} ({len(page)} bytes)")
+        print(f"site: {len(slugs)} markets ({' '.join(slugs)}); "
+              f"primary {primary} -> index.html")
+        return
     slug = "es"
     if "--market" in args:
         i = args.index("--market")
@@ -482,9 +647,7 @@ def main() -> None:
     out = Path(args[0]) if args else ROOT / ("site/index.html" if slug == "es"
                                              else f"site/{slug}.html")
     out.parent.mkdir(parents=True, exist_ok=True)
-    html = "<!doctype html><html><head><meta charset=\"utf-8\">" \
-           "<meta name=\"viewport\" content=\"width=device-width," \
-           "initial-scale=1\"></head><body>" + build(slug) + "</body></html>"
+    html = _page(build(slug))
     out.write_text(html)
     print(f"rendered {out} ({len(html)} bytes)")
 

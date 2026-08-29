@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><style>
+.talea-nav{display:flex;gap:10px 18px;align-items:baseline;flex-wrap:wrap;
+  max-width:920px;margin:0 auto;padding:18px 22px 0;
+  font-family:var(--mono,ui-monospace,monospace);}
+.talea-nav .brand{font-weight:700;letter-spacing:.04em;font-size:14px;
+  color:var(--ink,#111);text-decoration:none;}
+.talea-nav .mkts{display:flex;gap:14px;flex-wrap:wrap;}
+.talea-nav a{color:var(--ink2,#666);text-decoration:none;font-size:12.5px;
+  letter-spacing:.03em;}
+.talea-nav a:hover{color:var(--ink,#111);}
+.talea-nav a.here{color:var(--ink,#111);font-weight:600;
+  border-bottom:2px solid var(--ink,#111);padding-bottom:2px;}
+</style><nav class="talea-nav"><a class="brand" href="index.html">Talea</a><span class="mkts"><a href="index.html">Spain</a><a href="de.html">Germany</a><a href="gb.html" class="here">Great Britain</a><a href="ercot.html">ERCOT</a></span></nav><style>
+  :root { color-scheme: light;
+    --bg:#f9f9f7; --card:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e;
+    --muted:#898781; --grid:#e1e0d9; --border:rgba(11,11,11,.10);
+    --good:#006300; --accent:#2a78d6;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) {
+    color-scheme:dark; --bg:#0d0d0d; --card:#1a1a19; --ink:#fff; --ink2:#c3c2b7;
+    --grid:#2c2c2a; --border:rgba(255,255,255,.10); --good:#0ca30c; --accent:#3987e5; } }
+  :root[data-theme="dark"] {
+    color-scheme:dark; --bg:#0d0d0d; --card:#1a1a19; --ink:#fff; --ink2:#c3c2b7;
+    --grid:#2c2c2a; --border:rgba(255,255,255,.10); --good:#0ca30c; --accent:#3987e5; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    line-height:1.5; -webkit-font-smoothing:antialiased; }
+  a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+  .wrap { max-width:920px; margin:0 auto; padding:40px 22px 64px; }
+  header { margin-bottom:26px; }
+  .eyebrow { font:600 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted); margin:0 0 12px; }
+  h1 { font-size:30px; line-height:1.15; margin:0 0 12px; letter-spacing:-.02em;
+    text-wrap:balance; }
+  h2 { font-size:15px; margin:34px 0 12px; letter-spacing:-.01em; }
+  .asof { color:var(--ink2); font-size:13.5px; margin:0; max-width:60ch; }
+  code { font-family:var(--mono); font-size:.92em; }
+  .banner { background:var(--card); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px; font-size:13.5px; color:var(--ink2); margin:22px 0 6px; }
+  .banner b { color:var(--ink); }
+  .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); }
+  .mkt { display:block; background:var(--card); border:1px solid var(--border);
+    border-radius:12px; padding:18px 18px 16px; color:inherit; transition:border-color .12s; }
+  .mkt:hover { border-color:var(--accent); text-decoration:none; }
+  .mkt .name { font-size:16px; font-weight:600; color:var(--ink); margin:0 0 2px; }
+  .mkt .zone { font:11px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); }
+  .mkt .big { font-size:26px; font-weight:600; margin:14px 0 2px; font-variant-numeric:tabular-nums; }
+  .mkt .big.pos { color:var(--good); }
+  .mkt .sub { font-size:12.5px; color:var(--ink2); }
+  .mkt .status { display:inline-block; margin-top:12px; font:11px/1 var(--mono);
+    letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .open-card { background:var(--card); border:1px solid var(--border); border-radius:10px;
+    padding:12px 14px; display:flex; flex-wrap:wrap; gap:6px 14px; align-items:baseline; }
+  .open-card .pending { font:600 10.5px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
+    color:var(--accent); }
+  .open-card .oc { font-size:12.5px; color:var(--ink2); }
+  .open-card .m, .open-card b.m { font-family:var(--mono); font-size:12px; color:var(--ink); }
+  footer { margin-top:44px; color:var(--muted); font-size:12.5px; line-height:1.7; }
+</style><title>Great Britain day-ahead ledger</title>
+<div class="wrap">
+  <header>
+    <p class="eyebrow"><a href="index.html">Talea</a> · GB</p>
+    <h1>GB day-ahead battery arbitrage</h1>
+    <p class="asof">1&nbsp;MW / 2&nbsp;MWh virtual battery · decisions committed
+      before price publication (leak-guarded, OpenTimestamps-anchored) ·
+      as of <code>2026-08-29 04:20 London</code></p>
+  </header>
+  <div class="banner"><b>Live · awaiting first settled day.</b> The receipts
+    below are already committed and pushed <i>before</i> the auction publishes —
+    that is the whole point. Settlement (P&amp;L vs the realised prices) appears
+    here the day after the first target day publishes; nothing is backfilled.</div>
+  <h2>Committed receipts · awaiting settlement</h2>
+  <div class="open-card"><span class="pending">None yet</span><span class="oc">First receipt commits at the next pre-auction tick; watch this page.</span></div>
+  <footer>
+    <p>Paper money — no capital at stake. Prices: Elexon BMRS Market Index (Insights, open data). The ledger is
+      append-only and OpenTimestamps-anchored; verify everything yourself —
+      see VERIFY.md in this repository.</p>
+  </footer>
+</div></body></html>

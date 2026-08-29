@@ -148,6 +148,61 @@ def test_main_market_flag_selects_de(monkeypatch, tmp_path):
     assert "German (DE-LU) day-ahead battery arbitrage" in out.read_text()
 
 
+# ---- P1: one-project mirror (currency, awaiting, nav, ES-at-index) -----------
+
+def test_currency_symbol_is_per_market(monkeypatch, tmp_path):
+    """A GBP market renders £, never €. A public page showing the wrong currency
+    would undermine the credibility the record exists to establish."""
+    ledger = [_settle("2026-08-13", P, 100.0, 120.0, 0.83)]
+    receipts = [_receipt("2026-08-13", "2026-08-12", P)]
+    _seed(monkeypatch, tmp_path, "gb", ["2026-08-12", "2026-08-13"], ledger, receipts)
+    html = rd.build("gb")
+    assert "£" in html and "€" not in html
+    assert "Absolute GBP is an" in html
+
+
+def test_awaiting_page_when_no_settled_day(monkeypatch, tmp_path):
+    """A live market with committed receipts but no settled day renders the honest
+    'awaiting first settled day' page — never a crash, never a fake +0.00."""
+    receipts = [_receipt("2026-08-14", "2026-08-13", P)]
+    _seed(monkeypatch, tmp_path, "gb", ["2026-08-13"], [], receipts)   # empty ledger
+    html = rd.build("gb")
+    assert "awaiting first settled day" in html
+    assert "Pending" in html and "2026-08-14" in html
+    assert "+0.00" not in html
+
+
+def test_nav_links_all_markets_and_marks_current(monkeypatch):
+    nav = rd._nav(["es", "de", "gb"], "de", "es")
+    assert ">Talea<" in nav
+    assert 'href="index.html"' in nav              # primary es -> index.html
+    assert 'href="de.html" class="here"' in nav    # current market marked
+    assert 'href="gb.html"' in nav
+
+
+def test_main_site_es_is_index_others_are_siblings(monkeypatch, tmp_path):
+    """--site keeps the primary (ES) at index.html (NOT demoted to es.html) and
+    writes each other public market as a first-class sibling page, all carrying
+    the Talea nav. One project, no market subordinated, no 'benchmark' hub."""
+    _seed(monkeypatch, tmp_path, "es", ["2026-08-12", "2026-08-13"],
+          [_settle("2026-08-13", P, 100.0, 120.0, 0.90)],
+          [_receipt("2026-08-13", "2026-08-12", P)])
+    _seed(monkeypatch, tmp_path, "de", ["2026-08-12", "2026-08-13"],
+          [_settle("2026-08-13", P, 200.0, 210.0, 0.95)],
+          [_receipt("2026-08-13", "2026-08-12", P)])
+    fake = [type("M", (), {"slug": s})() for s in ("es", "de")]
+    monkeypatch.setattr(rd, "_public_markets", lambda: fake)
+    out = tmp_path / "site"
+    monkeypatch.setattr(rd.sys, "argv", ["render_dashboard.py", "--site", str(out)])
+    rd.main()
+    assert (out / "index.html").exists()           # ES at the root
+    assert not (out / "es.html").exists()          # ES not demoted
+    assert (out / "de.html").exists()
+    idx = (out / "index.html").read_text()
+    assert 'class="talea-nav"' in idx and "Spanish day-ahead battery arbitrage" in idx
+    assert "German (DE-LU) day-ahead battery arbitrage" in (out / "de.html").read_text()
+
+
 def test_day_card_skipped_when_basis_curve_missing(monkeypatch, tmp_path):
     # basis day 2026-08-12 has NO price row -> the day card is dropped, but the
     # settlement still appears in the append-only ledger table.

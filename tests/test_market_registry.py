@@ -27,9 +27,9 @@ def test_exactly_one_primary_and_the_rest_are_shadows():
 
 
 def test_query_helpers_match_the_flags():
-    assert {m.slug for m in reg.public_markets()} == {"es", "de"}
-    assert {m.slug for m in reg.by_driver("actions")} == {"ercot"}
-    assert {m.slug for m in reg.by_driver("server")} == {"de", "it", "pt", "fr"}
+    assert {m.slug for m in reg.public_markets()} == {"es", "de", "gb", "ercot"}
+    assert {m.slug for m in reg.by_driver("actions")} == {"ercot", "jp"}
+    assert {m.slug for m in reg.by_driver("server")} == {"de", "it", "pt", "fr", "gb"}
     # by_driver never returns the primary (the ES pass runs it directly)
     assert all(not m.primary for m in reg.by_driver("server"))
 

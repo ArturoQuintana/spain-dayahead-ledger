@@ -1,9 +1,27 @@
-# How to verify this ledger (for a skeptic)
+# How to verify Talea (for a skeptic)
 
-The claim: every trading decision in `Data/es/receipts.jsonl` was committed
-BEFORE the prices it would be judged against were published, and every P&L
-figure in `Data/es/ledger.jsonl` follows mechanically from those receipts and
-publicly available prices. You should not have to trust us on any of it.
+The claim, for EVERY market under `Data/<slug>/` (es, de, gb, ercot): every
+trading decision in `Data/<slug>/receipts.jsonl` was committed BEFORE the prices
+it would be judged against were published, and every P&L figure in
+`Data/<slug>/ledger.jsonl` follows mechanically from those receipts and publicly
+available prices. You should not have to trust us on any of it.
+
+The walk-through below uses **Spain (es)** — the longest-running market with the
+strongest attestation — as the worked example; substitute any `<slug>` and the
+same commands apply. The arithmetic checker in section 2 already covers every
+market at once (`--all`).
+
+## Markets and their attestation tier
+
+Not every market carries the same strength of evidence yet; stated plainly:
+
+- **es** — OTS-anchored (Bitcoin) from 2026-08-08; git-corroborated from
+  2026-07-30. The full three-tier story is in section 1.
+- **de** — git-attested (every tick commits and pushes `Data/de/`); not yet
+  OTS-anchored. The timing "weak check" applies; the "strong check" does not.
+- **gb**, **ercot** — newly launched (2026-08-28); git-attested from their first
+  tick. A market with no settled day yet shows only committed receipts (the
+  committed-before-truth evidence) until its first target day publishes.
 
 ## 1. The timing claim (receipts predate the auction)
 

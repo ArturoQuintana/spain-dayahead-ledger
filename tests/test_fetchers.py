@@ -82,3 +82,50 @@ def test_entsoe_parser_respects_timezone_for_pt_vs_it():
     pt = fetch_entsoe.parse_a44(xml, LISBON, date(2026, 8, 23), date(2026, 8, 24))
     assert it != pt
     # (the PT EIC is now owned by markets/pt and asserted in its contract test)
+
+
+def test_gb_market_index_apxmidp_only_hourly_mean():
+    """GB (Elexon BMRS Market Index): half-hourly APXMIDP aggregated to the London
+    hourly mean; the dead N2EXMIDP leg (all-zero, 2026-08) is excluded — averaging
+    it in would corrupt the price."""
+    from esios_paper.markets.gb import fetch as gb
+    payload = {"data": [
+        # London BST = UTC+1: UTC 23:00/23:30 of 08-19 -> 00:00/00:30 London 08-20 (hour 00)
+        {"dataProvider": "APXMIDP",  "price": 100.0, "startTime": "2026-08-19T23:00:00Z"},
+        {"dataProvider": "APXMIDP",  "price": 120.0, "startTime": "2026-08-19T23:30:00Z"},
+        {"dataProvider": "N2EXMIDP", "price": 0.0,   "startTime": "2026-08-19T23:00:00Z"},  # dead leg
+        {"dataProvider": "APXMIDP",  "price": 50.0,  "startTime": "2026-08-20T00:00:00Z"},  # hour 01
+        {"dataProvider": "APXMIDP",  "price": 60.0,  "startTime": "2026-08-20T00:30:00Z"},
+    ]}
+    out = gb.parse_market_index(payload, date(2026, 8, 20), date(2026, 8, 20))
+    assert out["2026-08-20T00"] == 110.0    # (100+120)/2 — N2EX 0.0 excluded
+    assert out["2026-08-20T01"] == 55.0     # (50+60)/2
+    assert 0.0 not in out.values()
+
+
+def test_jp_jepx_spot_system_price_hourly_and_unit_conversion():
+    """JEPX spot: SYSTEM price (col 5), the two 30-min slots of each hour aggregated
+    to the hourly mean, ¥/kWh -> ¥/MWh (×1000). Real CSV column shape; header + other
+    days skipped by the numeric parse."""
+    from esios_paper.markets.jp import fetch as jp
+    header = ("受渡日,時刻コード,売り入札量(kWh),買い入札量(kWh),約定総量(kWh),"
+              "システムプライス(円/kWh),エリアプライス北海道(円/kWh)")
+    csv = "\n".join([
+        header,
+        "2026/08/27,1,1,1,1,10.00,9.0",   # hour 00, slot 1
+        "2026/08/27,2,1,1,1,12.00,9.0",   # hour 00, slot 2 -> (10+12)/2 * 1000
+        "2026/08/27,3,1,1,1,20.00,9.0",   # hour 01, slot 3
+        "2026/08/27,4,1,1,1,30.00,9.0",   # hour 01, slot 4 -> (20+30)/2 * 1000
+        "2026/08/28,1,1,1,1,99.00,9.0",   # different day -> filtered out
+    ])
+    out = jp.parse_spot_summary(csv, date(2026, 8, 27), date(2026, 8, 27))
+    assert out["2026-08-27T00"] == 11000.0    # system price only; ¥/kWh -> ¥/MWh
+    assert out["2026-08-27T01"] == 25000.0
+    assert set(out) == {"2026-08-27T00", "2026-08-27T01"}   # header + other day skipped
+
+
+def test_jp_fiscal_year_boundary():
+    from esios_paper.markets.jp import fetch as jp
+    assert jp.fiscal_year(date(2026, 4, 1)) == 2026     # April -> FY2026
+    assert jp.fiscal_year(date(2026, 3, 31)) == 2025    # March -> prior FY
+    assert jp.fiscal_year(date(2027, 1, 15)) == 2026    # Jan -> prior FY

@@ -154,3 +154,39 @@ def test_ercot_listing_parse_download_unzip_pipeline():
     assert sum(1 for c in calls if "GetReports.do" in c) == 1
     downloads = sum(1 for c in calls if "doclookupId=" in c)
     assert 1 <= downloads <= 3      # posting revisions of the same delivery day
+
+
+def test_gb_bmrs_market_index_targets_elexon():
+    """GB fetch must hit Elexon's open BMRS Market Index endpoint (NOT EPEX/Nord
+    Pool directly, which are licence-restricted) and parse the APXMIDP leg."""
+    from esios_paper.markets.gb import fetch as gb
+    import json as _json
+    payload = _json.dumps({"data": [
+        {"dataProvider": "APXMIDP", "price": 80.0, "startTime": "2026-08-19T23:00:00Z"},
+        {"dataProvider": "APXMIDP", "price": 90.0, "startTime": "2026-08-19T23:30:00Z"},
+    ]}).encode()
+    calls = []
+    out = gb.fetch_hourly(date(2026, 8, 20), date(2026, 8, 20),
+                          _open=router({"data.elexon.co.uk": payload}, calls))
+    assert "data.elexon.co.uk" in calls[0] and "market-index" in calls[0]
+    assert "format=json" in calls[0]
+    assert out["2026-08-20T00"] == 85.0        # (80+90)/2, London hour 00
+
+
+def test_jp_fetch_targets_jepx_csv_with_referer():
+    """JP must fetch the JEPX spot CSV with the required Referer header (the server
+    returns 0 bytes without it) and the fiscal-year filename, then convert the
+    system price ¥/kWh -> ¥/MWh."""
+    from esios_paper.markets.jp import fetch as jp
+    import io
+    csv = ("受渡日,時刻コード,売り,買い,約定,システムプライス(円/kWh)\n"
+           "2026/08/27,1,1,1,1,10.00\n2026/08/27,2,1,1,1,12.00\n").encode()
+    seen = {}
+    def fake_open(req, timeout=None):
+        seen["url"] = req.full_url
+        seen["referer"] = req.get_header("Referer")
+        return io.BytesIO(csv)
+    out = jp.fetch_hourly(date(2026, 8, 27), date(2026, 8, 27), _open=fake_open)
+    assert "csv_read.php" in seen["url"] and "spot_summary_2026.csv" in seen["url"]
+    assert seen["referer"] == "https://www.jepx.jp/electricpower/market-data/spot/"
+    assert out["2026-08-27T00"] == 11000.0

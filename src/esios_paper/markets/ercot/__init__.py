@@ -15,7 +15,7 @@ from .fetch import make_fetch
 
 MARKET = Market.make("ercot", "America/Chicago", make_fetch("HB_NORTH"),
                      deadline_hour=10, currency="USD", driver="actions",
-                     redistributable=True,
+                     public=True, redistributable=True,
                      presentation=Presentation(
                          title="ERCOT (HB_NORTH) day-ahead battery arbitrage",
                          tab_name="ERCOT", tz_label="Chicago",
