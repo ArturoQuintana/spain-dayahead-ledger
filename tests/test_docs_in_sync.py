@@ -61,6 +61,26 @@ def test_architecture_table_flags_match_the_registry():
             f"{slug} driver flag drift: {line}"
 
 
+def test_verify_discloses_migrated_market_evidence_boundaries():
+    """Incident 2026-08-29 (independent auditor): consolidating markets into the
+    one `talea` repo makes a migrated market's git-history in THIS repo begin with
+    a bulk sync, so the timing 'weak check' (committed_at vs the commit that
+    introduced a receipt) cannot corroborate its pre-migration dates from this repo
+    alone. VERIFY.md MUST disclose that boundary for every migrated-in public
+    market — as it already does for ES's pre-2026-08-10 mirror bulk import — or the
+    'git-attested' label overclaims. Guards the ES and DE disclosures against being
+    dropped in a future VERIFY rewrite."""
+    v = (ROOT / "VERIFY.md").read_text().lower()
+    assert "2026-08-10" in v and "bulk" in v, \
+        "VERIFY.md must disclose ES's pre-2026-08-10 bulk-import evidence boundary"
+    assert "evidence boundary" in v, \
+        "VERIFY.md must name the evidence-boundary concept for migrated markets"
+    assert "germany-dayahead-ledger" in v or "consolidation" in v, \
+        ("VERIFY.md must disclose DE's evidence boundary — its talea git-history "
+         "begins with the 2026-08-29 consolidation sync, per-tick history lives "
+         "in the private repo / frozen germany-dayahead-ledger mirror")
+
+
 def test_every_public_market_has_a_colocated_data_licence():
     """Licensing travels with the data: each PUBLISHED market carries its own
     Data/<slug>/LICENSE.md (source + licence + attribution) and is indexed in

@@ -17,11 +17,20 @@ Not every market carries the same strength of evidence yet; stated plainly:
 
 - **es** — OTS-anchored (Bitcoin) from 2026-08-08; git-corroborated from
   2026-07-30. The full three-tier story is in section 1.
-- **de** — git-attested (every tick commits and pushes `Data/de/`); not yet
-  OTS-anchored. The timing "weak check" applies; the "strong check" does not.
+- **de** — OTS-anchored (Bitcoin) from 2026-08-27; the earlier days
+  (2026-08-24 → 08-26) are git-attested only. **Evidence boundary (parallel to
+  ES's above):** DE ran first on its own public mirror (`germany-dayahead-ledger`,
+  now frozen) and in the private code repo; DE's history entered THIS consolidated
+  `talea` repo as a single bulk sync at the 2026-08-29 one-project consolidation.
+  So the timing "weak check" (comparing a receipt's `committed_at` to the push
+  time of the commit that introduced it) does NOT corroborate pre-2026-08-29 DE
+  dates *from this repo alone* — use the OTS anchors (08-27+), or the per-tick
+  history in the private repo / the frozen `germany-dayahead-ledger` mirror (shown
+  on request). Arithmetic and append-only hold regardless.
 - **gb**, **ercot** — newly launched (2026-08-28); git-attested from their first
-  tick. A market with no settled day yet shows only committed receipts (the
-  committed-before-truth evidence) until its first target day publishes.
+  tick. A market with no settled day yet shows only its committed receipts — or,
+  before its very first receipt (as GB is), nothing but its `LICENSE.md`, and the
+  page says so ("awaiting first settled day").
 
 ## 1. The timing claim (receipts predate the auction)
 

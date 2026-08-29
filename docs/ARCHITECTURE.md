@@ -191,10 +191,12 @@ library. See docs/market-plugin-refactor-plan.md.
       settlement from raw prices + each receipt's own params (imports nothing
       from the package), re-checks the leak guard, proves append-only via the
       OTS-manifest prefix hashes, reports Bitcoin coverage. Tamper-tested
-      (tests/test_verify_ledger.py). It runs in CI, and each PUBLIC mirror (ES,
-      DE) runs it as its OWN workflow → the green "verify" badge in each mirror
-      README is a live, anonymous check, not decoration. Private markets
-      (IT/PT/ERCOT) are covered by the private CI's `--all`, not a public badge.
+      (tests/test_verify_ledger.py). It runs in CI, and the ONE public `talea`
+      mirror runs it as its OWN workflow (`verify.yml` → `verify_ledger.py --all`
+      over every public market) → the single green "verify" badge in the talea
+      README is a live, anonymous check across ES/DE/GB/ERCOT, not decoration.
+      (Consolidated 2026-08-29 from the former per-mirror workflows.) Private
+      markets (IT/PT/FR/JP) are covered by the private CI's `--all`, not published.
 
 ## Test suite & coverage gate (updated 2026-08-27)
 
