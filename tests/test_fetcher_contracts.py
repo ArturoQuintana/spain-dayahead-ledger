@@ -55,7 +55,16 @@ def test_es_apidatos_hourly_means_from_quarter_hour_values():
     out = fetch.fetch_hourly(date(2026, 8, 20), date(2026, 8, 20),
                              _open=router({"apidatos.ree.es": raw}, calls))
     assert len(out) == 24
-    assert out["2026-08-20T00"] == 194.59      # mean of the hour's 4 quarters
+    # mean of the hour's 4 quarters: (201.42+198.52+190.49+187.95)/4 = 194.595
+    # exactly, a genuine two-decimal rounding boundary. Which way round() lands
+    # depends on the LSB of the summed float, which itself depends on the
+    # interpreter's float-sum algorithm: CPython 3.12+ sums floats with
+    # Neumaier compensation (bpo-100425) and gets exactly 778.38 -> 194.59;
+    # 3.11 and earlier sum naively and get 778.3800000000001 -> 194.6. Both are
+    # correct roundings of their own (different, equally valid) intermediate
+    # float; assert the interpreter-independent invariant instead of pinning
+    # one side of a boundary this fixture happens to sit on.
+    assert out["2026-08-20T00"] in (194.59, 194.6)
     assert out["2026-08-20T12"] == 50.41
     assert out["2026-08-20T23"] == 173.01
     assert len(calls) == 1                       # single chunk for one day

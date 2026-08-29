@@ -27,10 +27,24 @@ Not every market carries the same strength of evidence yet; stated plainly:
   dates *from this repo alone* — use the OTS anchors (08-27+), or the per-tick
   history in the private repo / the frozen `germany-dayahead-ledger` mirror (shown
   on request). Arithmetic and append-only hold regardless.
-- **gb**, **ercot** — newly launched (2026-08-28); git-attested from their first
-  tick. A market with no settled day yet shows only its committed receipts — or,
-  before its very first receipt (as GB is), nothing but its `LICENSE.md`, and the
-  page says so ("awaiting first settled day").
+- **ercot** — newly launched (2026-08-27); OTS-stamped from its first tick,
+  not yet Bitcoin-anchored (proofs still "pending" — 1-2 days old).
+  **Evidence boundary** (same shape as DE's above): ERCOT's history entered
+  THIS consolidated `talea` repo in the same 2026-08-29
+  one-project-consolidation commit (`fd4bdd49`) that bulk-imported DE —
+  `git log` shows no earlier commit touching `Data/ercot/`. So the timing
+  "weak check" does NOT corroborate ERCOT's 2026-08-27/28 `committed_at`
+  values *from this repo alone* either;
+  rely on the OTS manifests (pending Bitcoin anchor) or the GitHub Actions run
+  history for the `ercot.yml` workflow (shown on request) until the weekly OTS
+  upgrade matures. Arithmetic and append-only hold regardless.
+- **gb** — newly launched (2026-08-28); no settled day yet, so nothing to
+  corroborate either way. A market with no settled day shows only its
+  committed receipts — or, before its very first receipt (as GB is), nothing
+  but its `LICENSE.md`, and the page says so ("awaiting first settled day").
+  The same bulk-import evidence boundary as DE/ERCOT will apply to GB's
+  earliest receipts once the consolidation-era ones settle; this note will be
+  updated to state that explicitly rather than assumed silently.
 
 ## 1. The timing claim (receipts predate the auction)
 

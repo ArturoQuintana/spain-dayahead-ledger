@@ -69,7 +69,13 @@ def test_verify_discloses_migrated_market_evidence_boundaries():
     alone. VERIFY.md MUST disclose that boundary for every migrated-in public
     market — as it already does for ES's pre-2026-08-10 mirror bulk import — or the
     'git-attested' label overclaims. Guards the ES and DE disclosures against being
-    dropped in a future VERIFY rewrite."""
+    dropped in a future VERIFY rewrite.
+
+    A second, same-day audit pass found the identical gap for ERCOT: its receipts
+    also entered this repo in the single fd4bdd49 consolidation commit, but
+    VERIFY.md's per-market tier section disclosed the boundary only for DE, not
+    ERCOT (which it instead described as plain 'git-attested from their first
+    tick' — the overclaim). Guard that disclosure too."""
     v = (ROOT / "VERIFY.md").read_text().lower()
     assert "2026-08-10" in v and "bulk" in v, \
         "VERIFY.md must disclose ES's pre-2026-08-10 bulk-import evidence boundary"
@@ -79,6 +85,12 @@ def test_verify_discloses_migrated_market_evidence_boundaries():
         ("VERIFY.md must disclose DE's evidence boundary — its talea git-history "
          "begins with the 2026-08-29 consolidation sync, per-tick history lives "
          "in the private repo / frozen germany-dayahead-ledger mirror")
+    assert "- **ercot**" in v, "VERIFY.md must give ERCOT its own tier bullet"
+    ercot_bullet = v.split("- **ercot**", 1)[1].split("\n- **", 1)[0]
+    assert "fd4bdd49" in ercot_bullet and "evidence boundary" in ercot_bullet, \
+        ("VERIFY.md's ERCOT bullet must disclose the same consolidation-commit "
+         "evidence boundary as DE's — not just describe ERCOT as plain "
+         "'git-attested from their first tick'")
 
 
 def test_every_public_market_has_a_colocated_data_licence():

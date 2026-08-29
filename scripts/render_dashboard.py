@@ -311,7 +311,7 @@ def build(slug: str = "es") -> str:
         gate_tile = (
             '<div class="tile"><div class="k">Market</div>'
             f'<div class="v">{slug.upper()}</div>'
-            '<div class="s">silent shadow ledger</div></div>')
+            '<div class="s">public ledger</div></div>')
         gate_section = ""
 
     return TEMPLATE % {

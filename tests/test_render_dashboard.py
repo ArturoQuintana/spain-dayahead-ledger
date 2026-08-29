@@ -121,7 +121,11 @@ def test_build_de_is_market_aware_without_gate(monkeypatch, tmp_path):
     assert "Germany day-ahead ledger" in html        # tab title
     assert "SMARD.de" in html                        # source line
     assert "Escalation gate" not in html             # gate is ES-only
-    assert "silent shadow ledger" in html and ">DE<" in html
+    assert "public ledger" in html and ">DE<" in html
+    # regression: DE/GB/ERCOT are public markets (public=True in the registry);
+    # the non-gate tile must never claim "silent" for a market the mirror
+    # actually publishes (auditor finding, 2026-08-29).
+    assert "silent" not in html.lower()
 
 
 # ---- main(): file output -----------------------------------------------------
