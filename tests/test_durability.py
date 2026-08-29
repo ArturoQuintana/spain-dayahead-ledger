@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-import esios_paper.__main__ as cli
-from esios_paper import loop
+import talea.__main__ as cli
+from talea import loop
 
 
 # ---- append: fsync + self-repair of a torn tail ------------------------------

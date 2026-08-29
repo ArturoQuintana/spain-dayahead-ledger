@@ -11,7 +11,7 @@ as plainly as wins (a weak strategy-week shows its number; a missed day shows as
 smaller day count, never backfilled).
 
 Markets, their display names, currencies, and public/private status come from the
-registry (esios_paper.markets) — the single source of truth — so a new public
+registry (talea.markets) — the single source of truth — so a new public
 market appears here automatically.
 
 Run: uv run python scripts/render_benchmark_note.py [--week-end YYYY-MM-DD]
@@ -29,8 +29,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
-from esios_paper import loop  # noqa: E402
-from esios_paper.markets import MARKETS, public_markets  # noqa: E402
+from talea import loop  # noqa: E402
+from talea.markets import MARKETS, public_markets  # noqa: E402
 import compare_strategies as cmp  # noqa: E402
 
 PRIMARY = "battery-2h2h-persistence"

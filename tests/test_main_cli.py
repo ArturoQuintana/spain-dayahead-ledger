@@ -9,8 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import esios_paper.__main__ as cli
-from esios_paper import loop
+import talea.__main__ as cli
+from talea import loop
 
 V = "1"
 

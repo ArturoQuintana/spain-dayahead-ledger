@@ -29,7 +29,7 @@ CUR_SYMBOL = {"EUR": "€", "GBP": "£", "USD": "$", "JPY": "¥"}
 # appears automatically; ES presentation strings live on the ES market and are
 # byte-for-byte what this dict used to hold, so the public page is unchanged.
 sys.path.insert(0, str(ROOT / "src"))
-from esios_paper.markets import (   # noqa: E402
+from talea.markets import (   # noqa: E402
     MARKETS as _REGISTRY, public_markets as _public_markets)
 
 

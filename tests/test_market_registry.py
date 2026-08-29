@@ -6,7 +6,7 @@ drift fails the build."""
 import importlib.util
 from pathlib import Path
 
-from esios_paper import markets as reg
+from talea import markets as reg
 
 ROOT = Path(__file__).resolve().parents[1]
 

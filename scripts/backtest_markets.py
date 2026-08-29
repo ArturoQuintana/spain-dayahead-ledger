@@ -18,7 +18,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from esios_paper.loop import (STRATEGIES, day_profile, kendall_tau,  # noqa: E402
+from talea.loop import (STRATEGIES, day_profile, kendall_tau,  # noqa: E402
                               pick_hours, pnl_eur)
 
 ROOT = Path(__file__).resolve().parents[1]

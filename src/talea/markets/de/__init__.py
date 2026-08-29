@@ -3,7 +3,7 @@ dashboard). SDAC-coupled, gate 12:00 CET, Europe/Berlin.
 
 Migrated into a vertical `markets/<slug>/` module in Phase 2 (2026-08-28), matching
 the FR pilot: this module owns Germany's fetcher (`markets/de/fetch.py` = the SMARD
-client) and presentation. `esios_paper.fetch_smard` stays a compat re-export shim
+client) and presentation. `talea.fetch_smard` stays a compat re-export shim
 so existing importers keep working.
 """
 from __future__ import annotations

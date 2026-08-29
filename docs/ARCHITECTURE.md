@@ -41,7 +41,7 @@ The `markets/` package is the SINGLE SOURCE OF TRUTH (Phase 0, 2026-08-27; becam
 a package in Phase 1, 2026-08-28): `markets/__init__.py` holds the registry and
 each `Market` carries flags (`primary`/`public`/`driver`/`redistributable` +
 `presentation`), and every operational surface — the email digest, `server_tick.sh`
-(via `python -m esios_paper markets --driver server`), `render_dashboard.py`, this
+(via `python -m talea markets --driver server`), `render_dashboard.py`, this
 table — QUERIES the registry instead of hardcoding a slug subset. The market
 CONTRACT (the `Fetcher` protocol + the re-exported `Market`/`Presentation` types,
 which stay defined in the `loop.py` core) lives in `markets/base.py`. Drift is
@@ -57,13 +57,13 @@ module scope (the ES fetcher is imported lazily inside `_default_market`), so th
 core is free of a module-time market dependency. **A `markets/<slug>/fetch.py`
 exists to house a
 market's DEDICATED fetch LOGIC** — DE owns the SMARD client, ERCOT the MIS pipeline
-(`esios_paper.fetch_smard`/`fetch_ercot` are compat shims). Markets that use the
+(`talea.fetch_smard`/`fetch_ercot` are compat shims). Markets that use the
 SHARED ENTSO-E A44 library (`markets/_entsoe.py`) own no fetch logic, so they have
 no `fetch.py`: their fetch is a one-line EIC/tz binding inline with the Market
 config. **IT, PT, and FR are INDEPENDENT markets** — each owns its EIC + timezone
 and binds the library; `markets/_entsoe.py` holds NO market constants, so a change
 to one cannot touch another (the old `fetch_entsoe.py` shared-module entanglement,
-defect #3, is fixed). `esios_paper.fetch_entsoe` is a compat shim re-exporting the
+defect #3, is fixed). `talea.fetch_entsoe` is a compat shim re-exporting the
 library. See docs/market-plugin-refactor-plan.md.
 
 ## Components
@@ -73,7 +73,7 @@ library. See docs/market-plugin-refactor-plan.md.
     │  esios-tick.timer      11:00 / 12:30 / 17:00 Europe/Madrid → server_tick.sh   │
     │  esios-ots-upgrade     Sun 12:00 Madrid → weekly_maintenance.sh               │
     │                                                                               │
-    │ server_tick.sh: git pull → python -m esios_paper tick → publish_mirror.sh     │
+    │ server_tick.sh: git pull → python -m talea tick → publish_mirror.sh     │
     └──────────────┬──────────────────────────────────────────────┬─────────────────┘
                    │ git push (audit trail)                       │ git push (allowlist)
                    ▼                                              ▼
@@ -91,7 +91,7 @@ library. See docs/market-plugin-refactor-plan.md.
 
 ## Package layout
 
-    src/esios_paper/     (map: src/esios_paper/README.md)
+    src/talea/     (map: src/talea/README.md)
       loop.py      THE FUNCTIONAL CORE. Tick orchestrator, leak/clock guards,
                    settlement + P&L math, storage, telemetry. Market-agnostic.
       __main__.py  THE IMPERATIVE SHELL. CLI, git backup, OTS stamping, heartbeat,

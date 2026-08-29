@@ -8,8 +8,8 @@ from datetime import date
 
 import pytest
 
-import esios_paper.loop as loop
-from esios_paper.loop import day_profile, pick_hours, pnl_eur, tick
+import talea.loop as loop
+from talea.loop import day_profile, pick_hours, pnl_eur, tick
 
 
 @pytest.fixture(autouse=True)
@@ -342,8 +342,8 @@ def test_fetch_retry_recovers_transient_failure_and_commits():
 # --- CLI market routing (silent markets skip ES-only side effects) ---
 
 def test_cmd_tick_silent_market_skips_heartbeat_email_git_ots(monkeypatch):
-    import esios_paper.__main__ as cli
-    import esios_paper.markets as markets
+    import talea.__main__ as cli
+    import talea.markets as markets
     calls = []
     monkeypatch.setattr(cli, "tick", lambda **kw: {
         "market": kw["market"].slug, "date": "2026-08-22", "target": "2026-08-23",
@@ -362,14 +362,14 @@ def test_cmd_tick_silent_market_skips_heartbeat_email_git_ots(monkeypatch):
 
 
 def test_cmd_tick_unknown_market_errors(monkeypatch):
-    import esios_paper.__main__ as cli
+    import talea.__main__ as cli
     assert cli.cmd_tick("atlantis") == 2
 
 
 # --- OpenTimestamps attestation (best-effort, never fatal) ---
 
 def test_ots_manifest_binds_current_audit_trail(monkeypatch, tmp_path):
-    import esios_paper.__main__ as cli
+    import talea.__main__ as cli
     monkeypatch.setattr(cli, "RECEIPTS", tmp_path / "receipts.jsonl")
     monkeypatch.setattr(cli, "LEDGER", tmp_path / "ledger.jsonl")
     (tmp_path / "receipts.jsonl").write_text('{"target": "2026-08-09"}\n')
@@ -387,7 +387,7 @@ def test_ots_stamped_manifest_is_immutable_second_tick_gets_new_slot(
     (audit trail changed by settlement) must NEVER rewrite an already-stamped
     manifest — it stamps a suffixed one. 12/13 proofs were invalidated by the
     old overwrite-then-skip behavior."""
-    import esios_paper.__main__ as cli
+    import talea.__main__ as cli
     monkeypatch.setattr(cli, "RECEIPTS", tmp_path / "receipts.jsonl")
     monkeypatch.setattr(cli, "LEDGER", tmp_path / "ledger.jsonl")
     monkeypatch.setattr(cli, "OTS_DIR", tmp_path / "ots")
@@ -415,7 +415,7 @@ def test_ots_per_market_stamps_own_dir(monkeypatch, tmp_path):
     """DE OTS: silent markets anchor into their own Data/<slug>/ots with their
     own receipts/ledger, not the ES globals."""
     from pathlib import Path
-    import esios_paper.__main__ as cli
+    import talea.__main__ as cli
     (tmp_path / "de").mkdir()
     (tmp_path / "de" / "receipts.jsonl").write_text('{"t": "de"}\n')
     (tmp_path / "de" / "ledger.jsonl").write_text('{"t": "de"}\n')
@@ -432,7 +432,7 @@ def test_ots_per_market_stamps_own_dir(monkeypatch, tmp_path):
 
 
 def test_ots_stamp_failure_never_raises(monkeypatch, tmp_path):
-    import esios_paper.__main__ as cli
+    import talea.__main__ as cli
     monkeypatch.setattr(cli, "RECEIPTS", tmp_path / "receipts.jsonl")
     monkeypatch.setattr(cli, "LEDGER", tmp_path / "ledger.jsonl")
     monkeypatch.setattr(cli, "OTS_DIR", tmp_path / "ots")
@@ -451,7 +451,7 @@ def test_ots_stamp_failure_never_raises(monkeypatch, tmp_path):
 # --- email digest (best-effort inbox delivery) ---
 
 def _cli_with_data(monkeypatch, tmp_path):
-    import esios_paper.__main__ as cli
+    import talea.__main__ as cli
     monkeypatch.setattr(cli, "LEDGER", tmp_path / "ledger.jsonl")
     monkeypatch.setattr(cli, "RECEIPTS", tmp_path / "receipts.jsonl")
     monkeypatch.setattr(cli, "DATA_DIR", tmp_path)
@@ -483,7 +483,7 @@ def test_digest_never_auto_declares_bar_met(monkeypatch, tmp_path):
     # 30 days where climatology beats persistence — the OLD digest method would
     # have printed "BAR MET". The digest must NOT auto-declare it (a bar-met
     # claim is the referee-gated Option C verdict, not the digest's to make).
-    import esios_paper.__main__ as cli
+    import talea.__main__ as cli
     monkeypatch.setattr(cli, "LEDGER", tmp_path / "ledger.jsonl")
     monkeypatch.setattr(cli, "RECEIPTS", tmp_path / "receipts.jsonl")
     monkeypatch.setattr(cli, "DATA_DIR", tmp_path)
@@ -574,7 +574,7 @@ def test_email_digest_alerts_on_trouble_even_without_settlement(monkeypatch, tmp
 # --- heartbeat semantics (success = today's receipt exists) ---
 
 def test_heartbeat_signals_fail_when_no_receipt(monkeypatch):
-    import esios_paper.__main__ as cli
+    import talea.__main__ as cli
     calls = []
     monkeypatch.setenv("ESIOS_HEARTBEAT_URL", "https://hc.example/abc")
     cli.heartbeat(True, _urlopen=lambda u, timeout: calls.append(u))
@@ -583,14 +583,14 @@ def test_heartbeat_signals_fail_when_no_receipt(monkeypatch):
 
 
 def test_heartbeat_silent_without_url(monkeypatch):
-    import esios_paper.__main__ as cli
+    import talea.__main__ as cli
     monkeypatch.delenv("ESIOS_HEARTBEAT_URL", raising=False)
     monkeypatch.setattr(cli, "REPO", cli.REPO / "nonexistent")   # no .env either
     cli.heartbeat(True, _urlopen=lambda u, timeout: (_ for _ in ()).throw(AssertionError))
 
 
 def test_heartbeat_network_failure_never_raises(monkeypatch):
-    import esios_paper.__main__ as cli
+    import talea.__main__ as cli
     monkeypatch.setenv("ESIOS_HEARTBEAT_URL", "https://hc.example/abc")
     def boom(u, timeout):
         raise OSError("down")

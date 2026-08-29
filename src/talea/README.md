@@ -1,11 +1,11 @@
-# `esios_paper` — package layout
+# `talea` — package layout
 
 A committed-before-truth paper-trading loop on day-ahead electricity prices, across
 several markets. Two patterns organize the code; read them and the tree explains
 itself.
 
 ```
-esios_paper/
+talea/
   loop.py          THE FUNCTIONAL CORE. Pure domain logic: the tick orchestrator,
                    the leak/clock guards, settlement + P&L math, storage (append-
                    only receipts/ledger, atomic price writes, the writer lock),

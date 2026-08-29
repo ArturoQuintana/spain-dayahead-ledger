@@ -5,7 +5,7 @@ this market is driven from GitHub Actions US runners, not the Hetzner server.
 
 Migrated into a vertical `markets/<slug>/` module in Phase 2 (2026-08-28), matching
 DE/FR: owns the ERCOT MIS client (`markets/ercot/fetch.py`) + presentation.
-`esios_paper.fetch_ercot` stays a compat re-export shim (the `ercot.yml` workflow
+`talea.fetch_ercot` stays a compat re-export shim (the `ercot.yml` workflow
 and the fetcher tests keep working).
 """
 from __future__ import annotations

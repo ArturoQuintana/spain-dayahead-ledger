@@ -21,7 +21,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from esios_paper.loop import (CLIM_MIN_DAYS, CLIM_WINDOW, N_HOURS,   # noqa: E402
+from talea.loop import (CLIM_MIN_DAYS, CLIM_WINDOW, N_HOURS,   # noqa: E402
                               kendall_tau, pick_hours, pnl_eur)
 
 DEEP = Path(__file__).resolve().parents[1] / "Data" / "esios_prices.json"

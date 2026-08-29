@@ -1,4 +1,4 @@
-"""CLI: `python -m esios_paper tick` (the daily pass) / `status` (ledger summary)."""
+"""CLI: `python -m talea tick` (the daily pass) / `status` (ledger summary)."""
 from __future__ import annotations
 
 import hashlib

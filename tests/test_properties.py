@@ -6,7 +6,7 @@ correlation. A counterexample here is a real bug in the P&L foundation."""
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
-from esios_paper.loop import (FEE_EUR_MWH, N_HOURS, POWER_MW, RT_EFF,
+from talea.loop import (FEE_EUR_MWH, N_HOURS, POWER_MW, RT_EFF,
                               kendall_tau, pick_hours, pnl_eur)
 
 prices = st.floats(min_value=-500, max_value=4000, allow_nan=False,

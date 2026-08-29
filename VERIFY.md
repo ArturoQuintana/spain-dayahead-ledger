@@ -92,7 +92,7 @@ both derived from the OMIE auction. For any settled day:
         - 0.5 EUR/MWh * (2 * 1.0 + 2 * 0.85)        # fees on energy moved
 
 The oracle is the same formula over the day's 2 cheapest / 2 dearest hours;
-capture = pnl / oracle_pnl. The exact code is `src/esios_paper/loop.py`
+capture = pnl / oracle_pnl. The exact code is `src/talea/loop.py`
 (pure functions, unit-tested: `uv run pytest`). The independent second price
 route is cross-checked weekly (`scripts/crosscheck_routes.py`).
 

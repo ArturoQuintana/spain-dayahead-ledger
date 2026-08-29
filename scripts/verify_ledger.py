@@ -6,7 +6,7 @@ committed decisions (receipts.jsonl) FROM SCRATCH, using each receipt's OWN
 recorded params, and diffs the result against ledger.jsonl. Also checks the
 append-only + leak-guard invariants and reports OpenTimestamps coverage.
 
-Deliberately stdlib-only and imports NOTHING from esios_paper: a bug in the
+Deliberately stdlib-only and imports NOTHING from talea: a bug in the
 loop's own P&L code cannot hide here, and an auditor can run this file alone.
 
     uv run python scripts/verify_ledger.py            # ES (the public ledger)

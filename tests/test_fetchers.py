@@ -9,8 +9,8 @@ from datetime import date
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from esios_paper.markets.de import fetch as fetch_smard
-from esios_paper.markets.ercot import fetch as fetch_ercot
+from talea.markets.de import fetch as fetch_smard
+from talea.markets.ercot import fetch as fetch_ercot
 
 ROME = ZoneInfo("Europe/Rome")   # sample tz for the library parse_a44 tests
 LISBON = ZoneInfo("Europe/Lisbon")
@@ -56,7 +56,7 @@ def test_ercot_parse_dam_csv_other_hub_and_range():
 
 
 def test_entsoe_parse_a44_aggregates_quarter_hours_and_fills_gaps():
-    from esios_paper.markets import _entsoe as fetch_entsoe
+    from talea.markets import _entsoe as fetch_entsoe
     xml = (FIX / "entsoe_a44.xml").read_text()
     out = fetch_entsoe.parse_a44(xml, ROME, date(2026, 8, 24), date(2026, 8, 24))
     # period start 22:00Z = 00:00 Rome (CEST +2); 8 quarter-hours = 2 local hours
@@ -68,13 +68,13 @@ def test_entsoe_parse_a44_aggregates_quarter_hours_and_fills_gaps():
 
 
 def test_entsoe_parse_a44_range_filter():
-    from esios_paper.markets import _entsoe as fetch_entsoe
+    from talea.markets import _entsoe as fetch_entsoe
     xml = (FIX / "entsoe_a44.xml").read_text()
     assert fetch_entsoe.parse_a44(xml, ROME, date(2030, 1, 1), date(2030, 1, 2)) == {}
 
 
 def test_entsoe_parser_respects_timezone_for_pt_vs_it():
-    from esios_paper.markets import _entsoe as fetch_entsoe
+    from talea.markets import _entsoe as fetch_entsoe
     xml = (FIX / "entsoe_a44.xml").read_text()
     # same UTC data, different zone -> different local-hour keys (PT=Lisbon is
     # one hour behind IT=Rome), proving the tz is actually threaded through.
@@ -88,7 +88,7 @@ def test_gb_market_index_apxmidp_only_hourly_mean():
     """GB (Elexon BMRS Market Index): half-hourly APXMIDP aggregated to the London
     hourly mean; the dead N2EXMIDP leg (all-zero, 2026-08) is excluded — averaging
     it in would corrupt the price."""
-    from esios_paper.markets.gb import fetch as gb
+    from talea.markets.gb import fetch as gb
     payload = {"data": [
         # London BST = UTC+1: UTC 23:00/23:30 of 08-19 -> 00:00/00:30 London 08-20 (hour 00)
         {"dataProvider": "APXMIDP",  "price": 100.0, "startTime": "2026-08-19T23:00:00Z"},
@@ -107,7 +107,7 @@ def test_jp_jepx_spot_system_price_hourly_and_unit_conversion():
     """JEPX spot: SYSTEM price (col 5), the two 30-min slots of each hour aggregated
     to the hourly mean, ¥/kWh -> ¥/MWh (×1000). Real CSV column shape; header + other
     days skipped by the numeric parse."""
-    from esios_paper.markets.jp import fetch as jp
+    from talea.markets.jp import fetch as jp
     header = ("受渡日,時刻コード,売り入札量(kWh),買い入札量(kWh),約定総量(kWh),"
               "システムプライス(円/kWh),エリアプライス北海道(円/kWh)")
     csv = "\n".join([
@@ -125,7 +125,7 @@ def test_jp_jepx_spot_system_price_hourly_and_unit_conversion():
 
 
 def test_jp_fiscal_year_boundary():
-    from esios_paper.markets.jp import fetch as jp
+    from talea.markets.jp import fetch as jp
     assert jp.fiscal_year(date(2026, 4, 1)) == 2026     # April -> FY2026
     assert jp.fiscal_year(date(2026, 3, 31)) == 2025    # March -> prior FY
     assert jp.fiscal_year(date(2027, 1, 15)) == 2026    # Jan -> prior FY

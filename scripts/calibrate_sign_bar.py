@@ -24,7 +24,7 @@ from arch.bootstrap import optimal_block_length
 from statsmodels.tsa.stattools import kpss
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from esios_paper.loop import (climatology_basis, day_profile,  # noqa: E402
+from talea.loop import (climatology_basis, day_profile,  # noqa: E402
                               persistence_basis, pick_hours, pnl_eur)
 
 ROOT = Path(__file__).resolve().parents[1]

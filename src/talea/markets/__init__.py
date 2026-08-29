@@ -10,7 +10,7 @@ before it there were five drifting hand-synced lists).
 
 Phase 1 (2026-08-28): `markets.py` became the `markets/` package. The public API
 (`MARKETS`, `shadows`, `public_markets`, `by_driver`, and the contract types) is
-unchanged, so every `from esios_paper.markets import …` keeps working. The
+unchanged, so every `from talea.markets import …` keeps working. The
 contract now lives in `base.py`; per-market plugins (`markets/<slug>/`) land here
 in later phases.
 """

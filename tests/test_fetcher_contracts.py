@@ -16,10 +16,10 @@ from pathlib import Path
 
 import pytest
 
-from esios_paper.markets import _entsoe as fetch_entsoe
-from esios_paper.markets.de import fetch as fetch_smard
-from esios_paper.markets.ercot import fetch as fetch_ercot
-from esios_paper.markets.es import fetch
+from talea.markets import _entsoe as fetch_entsoe
+from talea.markets.de import fetch as fetch_smard
+from talea.markets.ercot import fetch as fetch_ercot
+from talea.markets.es import fetch
 
 FIX = Path(__file__).resolve().parent / "fixtures"
 
@@ -94,7 +94,7 @@ def test_de_smard_selects_overlapping_bucket_only():
 
 def test_pt_entsoe_a44_aggregates_quarter_hours(monkeypatch):
     monkeypatch.setenv("ENTSOE_TOKEN", "test-token")   # _open is mocked anyway
-    from esios_paper.markets.pt import PT, LISBON
+    from talea.markets.pt import PT, LISBON
     xml = (FIX / "entsoe_a44_pt_2026-08-20.xml").read_bytes()
     calls = []
     fetch_pt = fetch_entsoe.make_fetch(PT, LISBON,
@@ -113,7 +113,7 @@ def test_fr_entsoe_targets_the_france_zone(monkeypatch):
     copy-paste-the-wrong-EIC bug that would silently onboard a mislabeled market.
     Guards markets/fr/'s EIC + Europe/Paris wiring against the shared A44 client."""
     monkeypatch.setenv("ENTSOE_TOKEN", "test-token")
-    from esios_paper.markets.fr import FR, PARIS
+    from talea.markets.fr import FR, PARIS
     assert FR == "10YFR-RTE------C" and str(PARIS) == "Europe/Paris"
     xml = (FIX / "entsoe_a44_pt_2026-08-20.xml").read_bytes()   # A44 parse is zone-agnostic
     calls = []
@@ -159,7 +159,7 @@ def test_ercot_listing_parse_download_unzip_pipeline():
 def test_gb_bmrs_market_index_targets_elexon():
     """GB fetch must hit Elexon's open BMRS Market Index endpoint (NOT EPEX/Nord
     Pool directly, which are licence-restricted) and parse the APXMIDP leg."""
-    from esios_paper.markets.gb import fetch as gb
+    from talea.markets.gb import fetch as gb
     import json as _json
     payload = _json.dumps({"data": [
         {"dataProvider": "APXMIDP", "price": 80.0, "startTime": "2026-08-19T23:00:00Z"},
@@ -177,7 +177,7 @@ def test_jp_fetch_targets_jepx_csv_with_referer():
     """JP must fetch the JEPX spot CSV with the required Referer header (the server
     returns 0 bytes without it) and the fiscal-year filename, then convert the
     system price ¥/kWh -> ¥/MWh."""
-    from esios_paper.markets.jp import fetch as jp
+    from talea.markets.jp import fetch as jp
     import io
     csv = ("受渡日,時刻コード,売り,買い,約定,システムプライス(円/kWh)\n"
            "2026/08/27,1,1,1,1,10.00\n2026/08/27,2,1,1,1,12.00\n").encode()

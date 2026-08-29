@@ -17,9 +17,9 @@ from datetime import date, datetime
 
 import pytest
 
-import esios_paper.loop as loop
-from esios_paper import markets as reg
-from esios_paper.loop import tick
+import talea.loop as loop
+from talea import markets as reg
+from talea.loop import tick
 
 MARKETS = list(reg.MARKETS.values())
 IDS = [m.slug for m in MARKETS]

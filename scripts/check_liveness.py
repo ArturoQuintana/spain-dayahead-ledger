@@ -31,7 +31,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from esios_paper import markets as registry  # noqa: E402
+from talea import markets as registry  # noqa: E402
 
 STALE_HOURS = 48.0
 

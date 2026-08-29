@@ -10,8 +10,8 @@ doc."""
 import re
 from pathlib import Path
 
-from esios_paper.loop import STRATEGIES
-from esios_paper.markets import MARKETS
+from talea.loop import STRATEGIES
+from talea.markets import MARKETS
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHITECTURE = (ROOT / "docs" / "ARCHITECTURE.md").read_text()
@@ -67,7 +67,7 @@ def test_every_public_market_has_a_colocated_data_licence():
     DATA-SOURCES.md. A public market missing its licence file could redistribute
     third-party price data with no attribution — a licence breach. (Private
     markets are never published, so they need no public licence file.)"""
-    from esios_paper.markets import public_markets
+    from talea.markets import public_markets
     index = (ROOT / "DATA-SOURCES.md").read_text()
     for m in public_markets():
         lic = ROOT / "Data" / m.slug / "LICENSE.md"
@@ -87,7 +87,7 @@ def test_mirror_is_deny_by_default_allowlist():
     skips publishing when the lookup is empty (so a bad lookup can never
     --delete-excluded the whole mirror). Leaking a private market now requires
     flagging it public in the registry, not forgetting an exclude."""
-    from esios_paper.markets import public_markets
+    from talea.markets import public_markets
     txt = (ROOT / "scripts" / "publish_mirror.sh").read_text()
     assert "--exclude='*'" in txt, \
         "mirror publish must end in a deny-all --exclude='*' (allowlist posture)"

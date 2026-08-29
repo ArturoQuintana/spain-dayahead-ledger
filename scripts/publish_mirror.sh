@@ -22,7 +22,7 @@ MIRROR="${MIRROR_DIR:-$HOME/ledger-mirror}"
 # public market is published automatically; a private one is impossible to leak
 # (it is never on the include list AND the terminal --exclude='*' drops it). If the
 # lookup fails, publish NOTHING rather than wipe the mirror (fail-safe).
-SLUGS="$(uv run --no-dev python -m esios_paper markets --public 2>/dev/null)"
+SLUGS="$(uv run --no-dev python -m talea markets --public 2>/dev/null)"
 if [ -z "$SLUGS" ]; then
   echo "[mirror] could not resolve public markets; skipping (fail-safe)"; exit 0
 fi
