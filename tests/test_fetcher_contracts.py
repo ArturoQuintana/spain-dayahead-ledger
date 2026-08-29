@@ -202,6 +202,27 @@ def test_gb_chunks_windows_to_elexon_7day_cap():
         assert (to - frm) <= _td(days=7), f"chunk exceeds Elexon 7-day cap: {url}"
 
 
+def test_gb_settlementperiod_fallback_and_null_price_skip():
+    """Some Elexon records lack startTime and carry settlementDate +
+    settlementPeriod instead (period 1 = 00:00–00:30 London); parse_market_index
+    must fall back to that. A null price is SKIPPED, never treated as 0 (which
+    would silently drag the hourly mean down). Covers the parser's fallback +
+    null-guard branches."""
+    from talea.markets.gb.fetch import parse_market_index
+    payload = {"data": [
+        # no startTime -> settlementDate/period fallback; periods 1 & 2 = London hour 00
+        {"dataProvider": "APXMIDP", "price": 70.0, "settlementDate": "2026-08-20", "settlementPeriod": 1},
+        {"dataProvider": "APXMIDP", "price": 80.0, "settlementDate": "2026-08-20", "settlementPeriod": 2},
+        # null price (period 3 = hour 01) -> skipped, so hour 01 gets no key
+        {"dataProvider": "APXMIDP", "price": None, "settlementDate": "2026-08-20", "settlementPeriod": 3},
+        # wrong provider -> ignored
+        {"dataProvider": "N2EXMIDP", "price": 0.0, "settlementDate": "2026-08-20", "settlementPeriod": 1},
+    ]}
+    out = parse_market_index(payload, date(2026, 8, 20), date(2026, 8, 20))
+    assert out["2026-08-20T00"] == 75.0        # (70+80)/2, periods 1&2; N2EXMIDP ignored
+    assert "2026-08-20T01" not in out          # only a null price there -> no key, not 0
+
+
 def test_jp_fetch_targets_jepx_csv_with_referer():
     """JP must fetch the JEPX spot CSV with the required Referer header (the server
     returns 0 bytes without it) and the fiscal-year filename, then convert the

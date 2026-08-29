@@ -54,7 +54,7 @@ cp VERIFY.md GOVERNANCE.md DATA-SOURCES.md pyproject.toml uv.lock "$MIRROR/"
 [ -f LICENSE ] && cp LICENSE "$MIRROR/"
 for d in backtest-baselines-2015-2026.md backtest-markets-2026-08.md ARCHITECTURE.md \
          gate-analysis-plan.md gate-verdict-2026-08.md incidents.md \
-         research-track-records-2026-08.md; do
+         research-track-records-2026-08.md knowledge-map.md; do
   cp "docs/$d" "$MIRROR/docs/" 2>/dev/null || true
 done
 cp README-public.md "$MIRROR/README.md"

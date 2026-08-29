@@ -101,7 +101,11 @@ git history, not on a timestamp (a timestamp proves "existed before X",
 which is meaningful for a pre-publication commitment and vacuous for a
 post-publication settlement). Minting a proof dated today for an August-9
 settled state would be honest but would prove only "existed by today" —
-adding no pre-publication evidence — so we don't.
+adding no pre-publication evidence — so we don't. **STATUS (ratified
+2026-08-29): this is a SETTLED, permanent, disclosed limitation, NOT an open
+action item** — like the pre-2026-08-08 no-OTS window above, it will not be
+"resolved" because minting adds nothing a skeptic should value; it is stated
+here so the record is complete.
 Data/esios_prices.json (the independent cross-check route) updates
 WEEKLY by design — staleness under 7 days is normal.
 
