@@ -182,6 +182,26 @@ def test_gb_bmrs_market_index_targets_elexon():
     assert out["2026-08-20T00"] == 85.0        # (80+90)/2, London hour 00
 
 
+def test_gb_chunks_windows_to_elexon_7day_cap():
+    """Incident 2026-08-29: GB 400'd on EVERY scheduled tick. A market with no seed
+    prices fetches ~7 months from loop.py's default start in ONE request, but Elexon
+    caps the market-index from->to range at 7 days inclusive ("must not exceed 7
+    days"). fetch_hourly MUST split any window into <=7-day chunks — a single
+    over-limit request is exactly the bug. (It only ever 'worked' in a hand-run
+    2-day smoke test, which is one chunk.)"""
+    from talea.markets.gb import fetch as gb
+    from datetime import datetime as _dt, timedelta as _td
+    import json as _json, re
+    calls = []
+    gb.fetch_hourly(date(2026, 8, 1), date(2026, 8, 30),           # 30 days
+                    _open=router({"data.elexon.co.uk": _json.dumps({"data": []}).encode()}, calls))
+    assert len(calls) == 5                          # 6-day chunks -> ceil(30/6)
+    for url in calls:                               # NONE may exceed Elexon's cap
+        frm = _dt.fromisoformat(re.search(r"from=([^&]+)", url).group(1).replace("Z", "+00:00"))
+        to = _dt.fromisoformat(re.search(r"to=([^&]+)", url).group(1).replace("Z", "+00:00"))
+        assert (to - frm) <= _td(days=7), f"chunk exceeds Elexon 7-day cap: {url}"
+
+
 def test_jp_fetch_targets_jepx_csv_with_referer():
     """JP must fetch the JEPX spot CSV with the required Referer header (the server
     returns 0 bytes without it) and the fiscal-year filename, then convert the

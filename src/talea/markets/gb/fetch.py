@@ -59,15 +59,35 @@ def parse_market_index(payload, start: date, end: date) -> dict[str, float]:
     return {k: round(statistics.fmean(v), 2) for k, v in hour_vals.items()}
 
 
-def fetch_hourly(start: date, end: date, *, _open=urllib.request.urlopen) -> dict[str, float]:
-    """Hourly GB day-ahead (Market Index, APXMIDP) prices for [start, end]
-    inclusive, keyed by Europe/London local hour. Requests a UTC window covering
-    the local days. Raises on network/HTTP errors (the caller decides if stale is
-    OK)."""
-    frm = datetime(start.year, start.month, start.day, tzinfo=LONDON) - timedelta(hours=2)
-    to = datetime(end.year, end.month, end.day, tzinfo=LONDON) + timedelta(days=1, hours=2)
+# Elexon caps the market-index from->to range at 7 days INCLUSIVE (HTTP 400
+# "The date range between From and To inclusive must not exceed 7 days"). A market
+# with no seed data fetches from loop.py's default start (~7 months back), so a
+# single request over-runs the cap. We CHUNK the window into <=7-day requests and
+# merge; a normal daily tick is one chunk. (Discovered 2026-08-29: GB 400'd on
+# EVERY scheduled tick because its first fetch asked for the whole Jan->Aug
+# backfill in one call — it only ever "worked" in a hand-run 2-day smoke test.)
+_MAX_CHUNK_DAYS = 6   # 6 inclusive local days -> ~148h span, safely under 7 days
+
+
+def _fetch_window(frm_date: date, to_date: date, _open) -> object:
+    frm = datetime(frm_date.year, frm_date.month, frm_date.day, tzinfo=LONDON) - timedelta(hours=2)
+    to = datetime(to_date.year, to_date.month, to_date.day, tzinfo=LONDON) + timedelta(days=1, hours=2)
     url = (f"{API}?from={frm.astimezone(timezone.utc):%Y-%m-%dT%H:%M:%SZ}"
            f"&to={to.astimezone(timezone.utc):%Y-%m-%dT%H:%M:%SZ}&format=json")
     with _open(url, timeout=60) as r:
-        payload = json.load(r)
-    return parse_market_index(payload, start, end)
+        return json.load(r)
+
+
+def fetch_hourly(start: date, end: date, *, _open=urllib.request.urlopen) -> dict[str, float]:
+    """Hourly GB day-ahead (Market Index, APXMIDP) prices for [start, end]
+    inclusive, keyed by Europe/London local hour. Splits the window into
+    <=7-day chunks (Elexon's hard cap) and merges. Raises on network/HTTP errors
+    (the caller decides if stale is OK)."""
+    out: dict[str, float] = {}
+    cur = start
+    while cur <= end:
+        chunk_end = min(cur + timedelta(days=_MAX_CHUNK_DAYS - 1), end)
+        payload = _fetch_window(cur, chunk_end, _open)
+        out.update(parse_market_index(payload, cur, chunk_end))
+        cur = chunk_end + timedelta(days=1)
+    return out
