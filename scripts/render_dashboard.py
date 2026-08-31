@@ -197,11 +197,13 @@ def build(slug: str = "es") -> str:
     cap_mean = statistics.fmean(caps) * 100 if caps else 0
     wins = sum(1 for e in prim if e["pnl_eur"] > 0)
 
-    # missed primary days: dates in [first receipt target, last settled target]
-    # with no primary receipt at all
+    # missed primary days: dates in [first receipt target, last receipt target]
+    # with no primary receipt at all. Bounded by the last RECEIPT (not the last
+    # SETTLED day) so a commit gap surfaces immediately instead of waiting a
+    # full settlement cycle (independent-audit finding, 2026-08-31).
     prim_receipts = {r["target"] for r in receipts if r["strategy"] == PRIMARY}
     d0 = date.fromisoformat(min(prim_receipts))
-    d1 = date.fromisoformat(max(e["target"] for e in prim))
+    d1 = date.fromisoformat(max(prim_receipts))
     missed = []
     d = d0
     while d <= d1:

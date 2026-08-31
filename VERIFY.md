@@ -41,13 +41,15 @@ Not every market carries the same strength of evidence yet; stated plainly:
   rely on the OTS manifests (pending Bitcoin anchor) or the GitHub Actions run
   history for the `ercot.yml` workflow (shown on request) until the weekly OTS
   upgrade matures. Arithmetic and append-only hold regardless.
-- **gb** — newly launched (2026-08-28); no settled day yet, so nothing to
-  corroborate either way. A market with no settled day shows only its
-  committed receipts — or, before its very first receipt (as GB is), nothing
-  but its `LICENSE.md`, and the page says so ("awaiting first settled day").
-  The same bulk-import evidence boundary as DE/ERCOT will apply to GB's
-  earliest receipts once the consolidation-era ones settle; this note will be
-  updated to state that explicitly rather than assumed silently.
+- **gb** — newly launched (2026-08-28); no settled day yet, so no arithmetic
+  or capture claim to make. It now has committed receipts (per-tick, from
+  2026-08-30) and OTS-stamped manifests from 2026-08-29 — the earliest already
+  Bitcoin-CONFIRMED, the newest still "pending" (same maturation lag as DE/
+  ERCOT above). GB entered this repo via its own per-tick commits, not a bulk
+  import, so (unlike DE/ERCOT) the "weak check" above corroborates its receipts
+  from this repository alone with no evidence-boundary caveat needed. The page
+  says "awaiting first settled day" and is honest about that; VERIFY.md's
+  per-date OTS status is above and in `Data/gb/ots/`.
 
 ## 1. The timing claim (receipts predate the auction)
 

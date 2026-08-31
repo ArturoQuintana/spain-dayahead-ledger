@@ -25,7 +25,7 @@ strategy panel, P&L math, and guards are shared). Eight markets run today:
     IT      IT-SUD    ENTSO-E A44 · token, derived    EUR  12:00     server        private (license)
     PT      PT        ENTSO-E A44 · token, derived    EUR  12:00     server        private (license)
     FR      France    ENTSO-E A44 · token, derived    EUR  12:00     server        private (license)
-    GB      GB        Elexon BMRS · open (Insights)   GBP  11:00     server        Pages (git-attested)
+    GB      GB        Elexon BMRS · open (Insights)   GBP  11:00     server        Pages + OTS
     JP      JEPX      JEPX spot · open (attribution)  JPY  10:00     GitHub Actions private (silent-first; redistributable)
     ERCOT   HB_NORTH  ERCOT MIS NP4-190 · public/redist USD 10:00    GitHub Actions Pages (git-attested)
 

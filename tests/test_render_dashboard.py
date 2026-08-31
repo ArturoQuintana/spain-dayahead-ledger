@@ -104,6 +104,25 @@ def test_build_counts_missed_days(monkeypatch, tmp_path):
     assert "2 / 2" in html                           # both settled days won
 
 
+def test_build_missed_window_extends_to_last_receipt_not_last_settled(
+        monkeypatch, tmp_path):
+    """A commit gap AFTER the most recent settled day must surface immediately,
+    not wait a settlement cycle. Only one day (08-28) has settled; receipts exist
+    for 08-28 and 08-31 but NOT 08-29/08-30 (the tick didn't run). Bounding the
+    missed-day window by the last SETTLED target (instead of the last RECEIPT
+    target) hides this 2-day gap until 08-31 itself settles — the exact ERCOT
+    under-reporting the independent auditor found 2026-08-31 ('0 missed' on a
+    page with a real 2-day gap in receipts.jsonl)."""
+    ledger = [_settle("2026-08-28", P, 50.0, 60.0, 0.83)]
+    receipts = [_receipt("2026-08-28", "2026-08-27", P),
+                _receipt("2026-08-31", "2026-08-30", P)]      # 08-29, 08-30 missing
+    _seed(monkeypatch, tmp_path, "ercot",
+          ["2026-08-27", "2026-08-28", "2026-08-30", "2026-08-31"], ledger, receipts)
+    html = rd.build("ercot")
+    assert "2 missed" in html
+    assert "missed — no receipt committed" in html
+
+
 def test_build_no_open_receipts_shows_none(monkeypatch, tmp_path):
     ledger = [_settle("2026-08-13", P, 100.0, 120.0, 0.83)]
     receipts = [_receipt("2026-08-13", "2026-08-12", P)]      # all settled
