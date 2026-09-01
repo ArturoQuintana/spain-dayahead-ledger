@@ -16,6 +16,7 @@ from talea.markets import MARKETS
 ROOT = Path(__file__).resolve().parents[1]
 ARCHITECTURE = (ROOT / "docs" / "ARCHITECTURE.md").read_text()
 CLAUDE = (ROOT / "CLAUDE.md").read_text()
+INFRA = (ROOT / "INFRA.md").read_text()
 
 
 def test_every_market_is_documented():
@@ -107,6 +108,27 @@ def test_every_public_market_has_a_colocated_data_licence():
             f"public market {m.slug!r} has no Data/{m.slug}/LICENSE.md"
         assert f"Data/{m.slug}/" in index, \
             f"{m.slug!r} is public but missing from the DATA-SOURCES.md index"
+
+
+def test_infra_md_names_every_actions_driven_market():
+    """Incident 2026-09-01 (infra-continuity audit, second pass): JP started
+    ticking via GitHub Actions the same day the ERCOT cron was fixed, but
+    INFRA.md's System map GitHub Actions writer line was never updated to
+    name it — it still read 'ERCOT tick only'. Guard the writer inventory:
+    every market registered with driver == "actions" must be named (by
+    upper-case slug) on the System map's GitHub Actions line, so a future
+    market added on this driver can't silently drop off the recovery doc."""
+    line = next(l for l in INFRA.splitlines() if "GitHub Actions" in l
+                and "SCHEDULERS" not in l)
+    # The writer block wraps onto following indented lines until a blank one.
+    start = INFRA.index(line)
+    block = INFRA[start:start + INFRA[start:].index("\n\n")]
+    actions_markets = [slug for slug, m in MARKETS.items() if m.driver == "actions"]
+    missing = [slug for slug in actions_markets
+               if not re.search(rf"\b{slug.upper()}\b", block)]
+    assert not missing, (
+        f"markets driven by GitHub Actions but not named on INFRA.md's "
+        f"System map GitHub Actions line: {missing}")
 
 
 def test_mirror_is_deny_by_default_allowlist():
