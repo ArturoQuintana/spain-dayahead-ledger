@@ -259,20 +259,36 @@ def writer_lock(lock_path: Path):
 
 # --- pure strategy/accounting primitives (unit-tested) ---
 
-# Sanity rails on incoming prices: the EU SDAC technical bounds (mirrors
-# tools/esios-fetcher's PriceDay). Feed-break detector, not a domain truth.
-PRICE_MIN, PRICE_MAX = -500.0, 4000.0
+# Sanity rails on incoming prices — a feed-break detector, not a domain truth.
+# Bounds are PER CURRENCY because the native /MWh price scale differs by market:
+# EUR/GBP sit in the hundreds, USD (ERCOT) reaches the system offer cap ~$9000/MWh
+# in scarcity, and JPY (JEPX, ¥/MWh) is naturally in the thousands-to-hundreds-of-
+# thousands. A single EUR-scaled cap (the old -500..4000) silently REFUSED every
+# JP fetch as "insane" (11250 ¥/MWh = 11.25 ¥/kWh is normal) — so JP never stored
+# a price and accrued no track record from launch (incident 2026-09-02). The same
+# cap would refuse a legitimate ERCOT scarcity print > $4000/MWh.
+PRICE_BOUNDS: dict[str, tuple[float, float]] = {
+    "EUR": (-500.0, 4000.0),      # EU SDAC technical bounds
+    "GBP": (-500.0, 4000.0),      # GB (Elexon) — same order of magnitude
+    "USD": (-500.0, 9000.0),      # ERCOT — offer cap historically up to $9000/MWh
+    "JPY": (-1000.0, 400000.0),   # JEPX ¥/MWh — crises ~250 ¥/kWh = 250,000 ¥/MWh
+}
+DEFAULT_PRICE_BOUNDS = (-500.0, 4000.0)
 
 
-def validate_prices(new: dict[str, float]) -> str | None:
+def validate_prices(new: dict[str, float], currency: str = "EUR") -> str | None:
     """The append-only ledger's one unguarded failure mode is settling against
     a CORRUPTED feed (schema drift, unit change): unlike a missed day, that
     poisons the record permanently and invisibly. A fetch that fails these
-    rails is treated exactly like a failed fetch — retried, then refused."""
+    rails is treated exactly like a failed fetch — retried, then refused. Bounds
+    are per the market's CURRENCY (PRICE_BOUNDS) so a market whose native /MWh
+    scale is large (JPY) is not mistaken for a corrupt EUR feed."""
+    lo, hi = PRICE_BOUNDS.get(currency, DEFAULT_PRICE_BOUNDS)
     for ts, p in new.items():
         if not isinstance(p, (int, float)) or isinstance(p, bool) \
-                or not isfinite(p) or not (PRICE_MIN <= p <= PRICE_MAX):
-            return f"insane price {p!r} at {ts} — refusing to merge this fetch"
+                or not isfinite(p) or not (lo <= p <= hi):
+            return (f"insane price {p!r} at {ts} ({currency} bounds {lo}..{hi}) "
+                    f"— refusing to merge this fetch")
     return None
 
 
@@ -440,7 +456,7 @@ def tick(*, market: Market | None = None, fetch=None, today: date | None = None,
     for attempt in range(1 + len(retries)):
         try:
             fetched = fetch(fetch_from, tomorrow)
-            bad = validate_prices(fetched)
+            bad = validate_prices(fetched, market.currency)
             if bad:
                 raise ValueError(bad)
             prices.update(fetched)

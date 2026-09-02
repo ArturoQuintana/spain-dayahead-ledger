@@ -278,6 +278,23 @@ def test_validate_prices_rails():
     assert "insane" in loop.validate_prices({"t": True})
 
 
+def test_validate_prices_bounds_are_currency_aware():
+    """Incident 2026-09-02: the sanity rail was a single EUR-scaled cap
+    (-500..4000) applied to every market, so it REFUSED every JP fetch — JEPX
+    ¥/MWh is naturally in the thousands (11250 ¥/MWh = 11.25 ¥/kWh is normal) —
+    and JP never stored a price. Bounds must be per-currency."""
+    jp = {"2026-01-26T00": 11250.0, "2026-01-27T18": 250000.0}  # incl. a winter-crisis print
+    assert loop.validate_prices(jp, "JPY") is None              # normal JP now passes
+    assert "insane" in loop.validate_prices(jp, "EUR")          # the exact old bug
+    # ERCOT scarcity: USD/MWh can reach the offer cap ~$9000 — legitimate, must pass
+    assert loop.validate_prices({"t": 8000.0}, "USD") is None
+    assert "insane" in loop.validate_prices({"t": 8000.0}, "EUR")
+    # a genuinely corrupt JP feed is still refused (far above the JPY cap)
+    assert "insane" in loop.validate_prices({"t": 5_000_000.0}, "JPY")
+    # unknown currency falls back to the conservative EUR bounds
+    assert "insane" in loop.validate_prices({"t": 9999.0}, "XYZ")
+
+
 def test_silent_market_fetch_fails_fast_no_retry_backoff(tmp_path):
     """A silent market (fetch_retries=()) must NOT inherit ES's 20-min backoff:
     it runs before ES in server_tick.sh, so a stalled silent fetch would delay

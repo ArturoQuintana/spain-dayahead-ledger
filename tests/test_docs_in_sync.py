@@ -131,6 +131,65 @@ def test_infra_md_names_every_actions_driven_market():
         f"System map GitHub Actions line: {missing}")
 
 
+def test_system_map_deadline_table_matches_the_registry():
+    """docs/system-map.html is a DERIVED, hand-regenerated infra map; its per-market
+    publication-deadline table is the one part that maps directly onto machine-readable
+    config (the market registry), so it earns a cheap deterministic guard on EVERY CI
+    run instead of only the quarterly constitutional auditor. Asserts the table lists
+    EXACTLY the registered markets, and that each row's visibility, clock-guard cutoff
+    (deadline_hour + tz label), local zone, and writer match the registry. The rest of
+    the map (schedule / topology / flow / cloud-routine crons) stays auditor-guarded —
+    those sources are not machine-readable in this repo, so generation can't cover them."""
+    html = (ROOT / "docs" / "system-map.html").read_text()
+    section = html.split("Markets — publication deadlines", 1)[1].split("Schedule —", 1)[0]
+    market_rows = {}
+    for inner in re.findall(r"<tr>(.*?)</tr>", section, re.S):
+        m = re.match(r"\s*<td>([A-Z]{2,6}) ·", inner)   # data rows only (header uses <th>)
+        if m:
+            market_rows[m.group(1).lower()] = inner
+    assert set(market_rows) == set(MARKETS), (
+        f"system-map deadline table lists {set(market_rows)} but the registry has "
+        f"{set(MARKETS)} — add/remove the market row when the registry changes")
+    for slug, m in MARKETS.items():
+        row = market_rows[slug]
+        tzlabel = m.presentation.tz_label
+        vis = "public" if m.public else "private"
+        writer = "Actions" if m.driver == "actions" else "VPS"
+        assert f"{m.deadline_hour}:00 {tzlabel}" in row, \
+            f"{slug}: commit-by cell must read '{m.deadline_hour}:00 {tzlabel}' (from the registry)"
+        assert f">{vis}<" in row, f"{slug}: visibility must be {vis} (registry public={m.public})"
+        assert f">{writer}<" in row, f"{slug}: writer tag must be {writer} (registry driver={m.driver})"
+        assert str(m.tz) in row, f"{slug}: local zone must be {m.tz}"
+
+
+def test_incident_escape_tally_matches_the_table():
+    """Incident 2026-08-30: the escape-rate summary silently drifted to a stale
+    '6 of 11' — seeded 2026-08-21 and never recounted as ~11 later incidents were
+    appended, so the headline metric understated both the incident count AND the
+    escapes. The escape rate is the closed-defect-loop's own arrival metric, so a
+    wrong tally is itself a governance defect (and it already bit once). This guard
+    recomputes the tally from the table — total incident rows, and rows whose
+    'noticed first by' column (3rd cell) marks an ESCAPE — and asserts the
+    '**N of M incidents were escapes**' summary matches both. A future resolver
+    that appends a row but forgets to bump the number now fails CI, not silently."""
+    txt = (ROOT / "docs" / "incidents.md").read_text()
+    rows = [l for l in txt.splitlines() if re.match(r"\|\s*\d{4}-\d\d", l)]
+    assert rows, "no incident rows found — has the table format changed?"
+    # each row must be a clean 5-column markdown row so the positional
+    # 'noticed first by' cell is unambiguous (a stray pipe in a cell would misparse)
+    for l in rows:
+        assert l.count("|") == 6, \
+            f"incident row is not a clean 5-column row (stray pipe in a cell?): {l[:90]}"
+    total = len(rows)
+    escapes = sum(1 for l in rows if "ESCAPE" in l.split("|")[3])  # cell 3 = noticed-first-by
+    m = re.search(r"\*\*(\d+) of (\d+) incidents were escapes\*\*", txt)
+    assert m, "incidents.md must carry a '**N of M incidents were escapes**' summary line"
+    stated_esc, stated_total = int(m.group(1)), int(m.group(2))
+    assert (stated_esc, stated_total) == (escapes, total), (
+        f"escape-rate tally drift: summary says {stated_esc} of {stated_total}, but the "
+        f"table has {escapes} escapes of {total} incidents — recount and update the line")
+
+
 def test_mirror_is_deny_by_default_allowlist():
     """Incident 2026-08-28: FR (private, derived-only) leaked to the PUBLIC mirror
     through a DENY-LIST gap — fr/ was never added to the excludes. The Talea mirror

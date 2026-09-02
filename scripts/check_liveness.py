@@ -42,12 +42,28 @@ PRICE_STALE_DAYS = 2   # a market whose NEWEST PRICE is older than this has a
 # 400s, 2026-08-29 — invisible to every check because a market with no data has
 # nothing to verify AND no receipt to be "stale"). Stale prices are unambiguous:
 # a working day-ahead fetch always advances to ~today/tomorrow.
+NEVER_FETCH_TICKS = 3   # a market with >= this many dated OTS manifests (i.e. days
+# of tick-ATTEMPTS) but STILL no price stored has a fetch that has been failing
+# since launch — broken, not onboarding. This closes the gap the GB stale-price
+# rule missed: JP's fetch was REJECTED every run (EUR-scaled sanity cap vs the
+# ¥/MWh scale), so prices.json was NEVER populated -> no stale date to compare ->
+# it hid as the exempt NEVER for a week (incident 2026-09-02).
 
 
 def newest_price_date(prices_path: Path) -> date | None:
     """Newest local price date in a market's dataset, or None if it has none."""
     prices = load_prices(prices_path)
     return date.fromisoformat(max(prices)[:10]) if prices else None
+
+
+def ots_attempt_days(ots_dir: Path | None) -> int:
+    """Count dated OTS manifests — a proxy for how many days a market has been
+    TICKING (a tick stamps a manifest even when the fetch is refused and nothing
+    commits). Distinguishes a genuinely just-launched market (0-1) from one that
+    has been attempting for days without ever storing a price."""
+    if ots_dir is None or not ots_dir.exists():
+        return 0
+    return len(list(ots_dir.glob("*.txt")))
 
 
 def newest_commit(receipts_path: Path) -> datetime | None:
@@ -67,33 +83,48 @@ def newest_commit(receipts_path: Path) -> datetime | None:
 
 def market_liveness(slug: str, receipts_path: Path, now: datetime,
                     stale_hours: float = STALE_HOURS,
-                    prices_path: Path | None = None) -> dict:
+                    prices_path: Path | None = None,
+                    ots_dir: Path | None = None) -> dict:
     npd = newest_price_date(prices_path) if prices_path is not None else None
     price_age_d = (now.date() - npd).days if npd is not None else None
     fetch_stale = price_age_d is not None and price_age_d > PRICE_STALE_DAYS
+    # never-populated: ticking for days (OTS manifests) yet NO price ever stored ->
+    # the fetch has been failing/refused since launch, not onboarding (JP class).
+    never_fetched = (prices_path is not None and npd is None
+                     and ots_attempt_days(ots_dir) >= NEVER_FETCH_TICKS)
+    broken = fetch_stale or never_fetched
     nc = newest_commit(receipts_path)
     if nc is None:
-        # NEVER-committed: normally exempt (onboarding), BUT if its prices have
-        # gone stale the fetcher is broken, not onboarding — that is STALE.
+        # NEVER-committed: normally exempt (onboarding), BUT a broken fetch (stale
+        # prices, or never-populated-despite-ticking) is not onboarding — it is STALE.
         return {"slug": slug, "last_commit": None, "age_h": None,
-                "price_age_d": price_age_d, "fetch_stale": fetch_stale,
-                "state": "STALE" if fetch_stale else "NEVER"}
+                "price_age_d": price_age_d, "fetch_stale": broken,
+                "never_fetched": never_fetched,
+                "state": "STALE" if broken else "NEVER"}
     age_h = (now - nc).total_seconds() / 3600.0
-    stale = age_h > stale_hours or fetch_stale
+    stale = age_h > stale_hours or broken
     return {"slug": slug, "last_commit": nc, "age_h": age_h,
-            "price_age_d": price_age_d, "fetch_stale": fetch_stale,
+            "price_age_d": price_age_d, "fetch_stale": broken,
+            "never_fetched": never_fetched,
             "state": "STALE" if stale else "HEALTHY"}
 
 
 def assess(markets, now: datetime, stale_hours: float = STALE_HOURS) -> list[dict]:
-    return [market_liveness(m.slug, m.receipts_path, now, stale_hours,
-                            prices_path=getattr(m, "prices_path", None))
-            for m in markets]
+    out = []
+    for m in markets:
+        pp = getattr(m, "prices_path", None)
+        ots = getattr(m, "ots_dir", None) or ((pp.parent / "ots") if pp is not None else None)
+        out.append(market_liveness(m.slug, m.receipts_path, now, stale_hours,
+                                   prices_path=pp, ots_dir=ots))
+    return out
 
 
 def _fmt(r: dict) -> str:
     if r["state"] == "NEVER":
         return f"  NEVER    {r['slug']:6} — no receipts yet"
+    if r.get("never_fetched"):
+        return (f"  STALE    {r['slug']:6} — never stored a price despite ticking "
+                f"(fetch refused since launch?)")
     if r.get("fetch_stale"):
         return (f"  STALE    {r['slug']:6} — prices {r['price_age_d']}d stale "
                 f"(fetcher stopped)")

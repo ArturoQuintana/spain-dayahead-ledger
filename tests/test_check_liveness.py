@@ -149,3 +149,43 @@ def test_stale_prices_promote_a_recently_committing_market_to_stale(tmp_path):
     m = _with_prices(_receipts(tmp_path, "de", [10.0]), tmp_path, days_old=6)
     r = cl.market_liveness(m.slug, m.receipts_path, NOW, prices_path=m.prices_path)
     assert r["state"] == "STALE" and r["fetch_stale"] is True
+
+
+# ---- never-populated despite ticking = a broken fetch (the JP class, 2026-09-02) --
+
+def _empty_prices(m, tmp_path):
+    """Attach an EMPTY prices.json (fetch never once succeeded)."""
+    pp = tmp_path / f"{m.slug}_prices.json"
+    pp.write_text("[]")
+    m.prices_path = pp
+    return m
+
+
+def _with_ots(m, tmp_path, n):
+    """Attach an ots/ dir with n dated manifests = n days of tick-ATTEMPTS."""
+    od = tmp_path / f"{m.slug}_ots"
+    od.mkdir(exist_ok=True)
+    for i in range(n):
+        (od / f"2026-08-{20 + i:02d}.txt").write_text("x")
+    m.ots_dir = od
+    return m
+
+
+def test_never_populated_prices_despite_ticking_is_broken(tmp_path):
+    """JP class: a market ticking for days (OTS manifests exist) whose fetch is
+    REFUSED every run stores NO price ever — prices.json empty, no receipts. The
+    stale-price rule can't see it (no price date to age), so it hid as exempt
+    NEVER for a week. >= NEVER_FETCH_TICKS manifests with no price => STALE."""
+    m = _with_ots(_empty_prices(_receipts(tmp_path, "jp", None), tmp_path), tmp_path, n=5)
+    r = cl.market_liveness(m.slug, m.receipts_path, NOW,
+                           prices_path=m.prices_path, ots_dir=m.ots_dir)
+    assert r["state"] == "STALE" and r["never_fetched"] is True
+
+
+def test_just_launched_no_prices_few_ticks_stays_never(tmp_path):
+    """A genuinely just-launched market (< NEVER_FETCH_TICKS attempts, no price
+    yet) must NOT false-alarm — only SUSTAINED ticking with no price is broken."""
+    m = _with_ots(_empty_prices(_receipts(tmp_path, "new", None), tmp_path), tmp_path, n=1)
+    r = cl.market_liveness(m.slug, m.receipts_path, NOW,
+                           prices_path=m.prices_path, ots_dir=m.ots_dir)
+    assert r["state"] == "NEVER" and r["never_fetched"] is False
