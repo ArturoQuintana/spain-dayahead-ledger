@@ -1,9 +1,24 @@
 # Incident log (escape-rate ledger)
 
 One line per incident: what fired, WHO NOTICED FIRST (machinery | human |
-agent-session — the last two count as ESCAPES under the closed defect loop),
-resolution, detector added. Reviewed at month-ends. Seeded retroactively
-2026-08-21 from the full project history.
+agent-session), resolution, detector added. Reviewed at month-ends. Seeded
+retroactively 2026-08-21 from the full project history.
+
+**What counts as an ESCAPE (purpose-scoped rule, ratified by the user
+2026-09-02).** An escape is a defect caught by a **human, or a later/different
+agent-session** — i.e. by something OTHER than the responsible machinery —
+*before* that machinery caught it. The metric measures how often failures evade
+the machinery and reach a stable, consequential state before being noticed. A
+drift **introduced AND self-caught within the same authoring session**, before
+any independent party or scheduled check encountered it, is a **CORRECTION**
+(fixed in place, not a logged escape) — counting normal edit-cycle self-review as
+escapes would drown the metric in churn and stop it measuring machinery-vs-
+reality. The guard against an agent hiding self-caught drift is **a detector per
+class** (the closed defect loop), NOT tally-fiddling: an un-self-caught drift is
+still captured — by the scheduled machinery (a WIN) or by a human (an ESCAPE) —
+so nothing that reaches a stable state escapes accounting. (The prior wording —
+"agent-session always counts as an escape" — is superseded; the existing rows are
+unaffected, as each already persisted past its authoring session.)
 
 | Date | Incident | Noticed first by | Resolution | Detector added |
 |---|---|---|---|---|

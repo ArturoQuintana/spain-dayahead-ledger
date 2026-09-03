@@ -162,6 +162,35 @@ def test_system_map_deadline_table_matches_the_registry():
         assert str(m.tz) in row, f"{slug}: local zone must be {m.tz}"
 
 
+def test_enumerating_docs_list_every_routine_mirror():
+    """Enumeration drift (recurring — hit 3x over 2026-08-30..09-02): adding a
+    cloud routine + its docs/routines/ mirror WITHOUT updating the docs that
+    ENUMERATE the routines left them stale (INFRA.md said "SEVEN" and omitted 3
+    resolvers; docs/system-map.html's stat tile read 7). The set of routine
+    MIRRORS (docs/routines/*.md files carrying a '## Prompt (verbatim)' block) is
+    the single source of truth; every enumerating doc must agree with it. This
+    converts "I forgot to update the count" from a recurring agent-session catch
+    into a CI failure — so it's machinery-caught before commit, not an escape."""
+    routines = ROOT / "docs" / "routines"
+    mirrors = [p for p in sorted(routines.glob("*.md"))
+               if "## Prompt (verbatim)" in p.read_text()]
+    assert len(mirrors) >= 5, "expected the standing routine mirrors to be present"
+    infra = INFRA
+    readme = (routines / "README.md").read_text()
+    for p in mirrors:
+        assert p.stem in infra, (
+            f"routine mirror {p.stem!r} is not named in INFRA.md's cloud-routines "
+            f"map — update the MIRRORS list + the count when you add/remove a routine")
+        assert p.stem in readme, (
+            f"routine mirror {p.stem!r} is not named in docs/routines/README.md")
+    smap = (ROOT / "docs" / "system-map.html").read_text()
+    m = re.search(r'<div class="n">(\d+)</div><div class="l">standing routines', smap)
+    assert m, "docs/system-map.html must carry a '<n> standing routines' stat tile"
+    assert int(m.group(1)) == len(mirrors), (
+        f"system-map stat tile says {m.group(1)} standing routines but there are "
+        f"{len(mirrors)} routine mirrors — update the tile AND add the schedule row")
+
+
 def test_incident_escape_tally_matches_the_table():
     """Incident 2026-08-30: the escape-rate summary silently drifted to a stale
     '6 of 11' — seeded 2026-08-21 and never recounted as ~11 later incidents were
